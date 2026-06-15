@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors;
+  }
+  .sidebar-link.active {
+    @apply bg-blue-50 text-blue-700;
+  }
+}
