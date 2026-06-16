@@ -81,22 +81,24 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')   // ← add this
+  const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError('')   // ← clear previous error
+    setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError('Invalid email or password. Please try again.')  // ← set inline error
+      setError('Invalid email or password. Please try again.')
       toast.error(error.message)
       setLoading(false)
     } else {
@@ -117,13 +119,12 @@ export default function LoginPage() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Trackr</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">Nire</h1>
           <p className="text-sm text-zinc-500 mt-1">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleLogin} className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4">
           
-          {/* ← Add this error box */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
               {error}
@@ -143,14 +144,23 @@ export default function LoginPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              placeholder="••••••••"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full pl-3 pr-10 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
