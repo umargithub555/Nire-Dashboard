@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import SwRegister from '@/components/SwRegister'
+import SessionGuard from '@/components/SessionGuard'
 
 export const metadata: Metadata = {
   title: 'Nire — Staff Management',
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>
+        <SessionGuard />
         {children}
         <Toaster position="top-right" />
         <SwRegister />
