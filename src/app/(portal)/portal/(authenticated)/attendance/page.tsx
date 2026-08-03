@@ -1,12 +1,19 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { MapPin, Clock, Calendar } from 'lucide-react'
-import MapModal from '@/components/ui/MapModal'
+import { Attendance } from '@/types'
+
+const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
+  ssr: false,
+})
+
+type PortalAttendanceRecord = Attendance
 
 export default function PortalAttendancePage() {
-  const [attendance, setAttendance] = useState<any[]>([])
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null)
+  const [attendance, setAttendance] = useState<PortalAttendanceRecord[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<PortalAttendanceRecord | null>(null)
 
   useEffect(() => {
     fetch('/api/portal/attendance')
@@ -21,7 +28,6 @@ export default function PortalAttendancePage() {
         <p className="text-sm text-zinc-500 mt-0.5">{attendance.length} days recorded</p>
       </div>
 
-      {/* Desktop table */}
       <div className="hidden lg:block bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -35,7 +41,7 @@ export default function PortalAttendancePage() {
             {attendance.length === 0 && (
               <tr><td colSpan={3} className="px-6 py-10 text-center text-zinc-400">No records yet</td></tr>
             )}
-            {attendance.map((a: any) => (
+            {attendance.map((a) => (
               <tr key={a.id} className="hover:bg-zinc-50 transition-colors">
                 <td className="px-6 py-4 font-medium text-zinc-800">
                   {format(new Date(a.date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
@@ -73,14 +79,13 @@ export default function PortalAttendancePage() {
         </table>
       </div>
 
-      {/* Mobile card list */}
       <div className="lg:hidden space-y-3">
         {attendance.length === 0 && (
           <div className="bg-white border border-zinc-200 rounded-xl py-10 text-center text-sm text-zinc-400">
             No records yet
           </div>
         )}
-        {attendance.map((a: any) => (
+        {attendance.map((a) => (
           <div key={a.id} className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-sm font-medium text-zinc-800">
@@ -116,9 +121,9 @@ export default function PortalAttendancePage() {
       <MapModal
         isOpen={!!selectedRecord}
         onClose={() => setSelectedRecord(null)}
-        lat={selectedRecord?.clock_in_lat}
-        lng={selectedRecord?.clock_in_lng}
-        address={selectedRecord?.clock_in_address}
+        lat={selectedRecord?.clock_in_lat ?? 0}
+        lng={selectedRecord?.clock_in_lng ?? 0}
+        address={selectedRecord?.clock_in_address ?? ''}
         employeeName="Your check-in location"
         branchName={format(selectedRecord?.date ? new Date(selectedRecord.date + 'T00:00:00') : new Date(), 'EEE, MMM d, yyyy')}
       />

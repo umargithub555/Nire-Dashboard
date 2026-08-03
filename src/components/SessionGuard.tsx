@@ -3,7 +3,15 @@ import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 
-const SESSION_DURATION_MINUTES = 5  // ← change this for testing, e.g. 2 minutes
+const SESSION_DURATION_MINUTES = 30
+const authPages = new Set([
+  '/login',
+  '/forgot-password',
+  '/reset-password',
+  '/portal/login',
+  '/portal/forgot-password',
+  '/portal/reset-password',
+])
 
 export default function SessionGuard() {
   const supabase = createClient()
@@ -12,15 +20,15 @@ export default function SessionGuard() {
 
   useEffect(() => {
     const isPortal = pathname.startsWith('/portal')
-    const isLoginPage = pathname === '/login' || pathname === '/portal/login'
-    if (isLoginPage) return
+    if (authPages.has(pathname)) return
 
     async function checkSession() {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!session) return
 
       const loginTime = session.user.last_sign_in_at
-    //   console.log(loginTime)
       if (!loginTime) return
 
       const minutesSinceLogin = (Date.now() - new Date(loginTime).getTime()) / (1000 * 60)
@@ -31,8 +39,8 @@ export default function SessionGuard() {
       }
     }
 
-    checkSession()
-  }, [pathname])
+    void checkSession()
+  }, [pathname, router, supabase.auth])
 
   return null
 }

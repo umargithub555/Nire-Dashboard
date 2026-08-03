@@ -1,13 +1,20 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { MapPin, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import MapModal from '@/components/ui/MapModal'
+import { Visit } from '@/types'
+
+const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
+  ssr: false,
+})
+
+type PortalVisitRecord = Visit
 
 export default function PortalVisitsPage() {
-  const [visits, setVisits] = useState<any[]>([])
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null)
+  const [visits, setVisits] = useState<PortalVisitRecord[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<PortalVisitRecord | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
@@ -94,11 +101,11 @@ export default function PortalVisitsPage() {
             No visits logged yet
           </div>
         )}
-        {visits.map((v: any) => (
+        {visits.map((v) => (
           <div key={v.id} className="bg-white border border-zinc-200 rounded-xl p-4 lg:p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="font-medium text-zinc-900 text-sm lg:text-base">{v.purpose}</div>
-              <div className="text-xs text-zinc-400 shrink-0">{format(new Date(v.visited_at), 'MMM d · hh:mm a')}</div>
+              <div className="text-xs text-zinc-400 shrink-0">{format(new Date(v.visited_at), 'MMM d - hh:mm a')}</div>
             </div>
             {v.place_name && <div className="text-sm text-zinc-500 mt-1">{v.place_name}</div>}
             {v.address && (
@@ -121,7 +128,6 @@ export default function PortalVisitsPage() {
         ))}
       </div>
 
-      {/* Modal — bottom sheet on mobile */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6 max-h-[92vh] overflow-y-auto shadow-xl">
@@ -148,7 +154,7 @@ export default function PortalVisitsPage() {
                 <label className="block text-sm font-medium text-zinc-700 mb-1.5">Notes</label>
                 <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900 resize-none"
-                  rows={2} placeholder="Optional notes…" />
+                  rows={2} placeholder="Optional notes..." />
               </div>
 
               <div>
@@ -166,7 +172,7 @@ export default function PortalVisitsPage() {
                   <button type="button" onClick={captureLocation} disabled={locating}
                     className="w-full py-2.5 border border-dashed border-zinc-300 rounded-lg text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition-colors flex items-center justify-center gap-2">
                     <MapPin size={15} />
-                    {locating ? 'Getting location…' : 'Capture current location'}
+                    {locating ? 'Getting location...' : 'Capture current location'}
                   </button>
                 )}
               </div>
@@ -178,7 +184,7 @@ export default function PortalVisitsPage() {
                 </button>
                 <button type="submit" disabled={loading}
                   className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg">
-                  {loading ? 'Logging…' : 'Log visit'}
+                  {loading ? 'Logging...' : 'Log visit'}
                 </button>
               </div>
             </form>
@@ -189,9 +195,9 @@ export default function PortalVisitsPage() {
       <MapModal
         isOpen={!!selectedRecord}
         onClose={() => setSelectedRecord(null)}
-        lat={selectedRecord?.lat}
-        lng={selectedRecord?.lng}
-        address={selectedRecord?.address}
+        lat={selectedRecord?.lat ?? 0}
+        lng={selectedRecord?.lng ?? 0}
+        address={selectedRecord?.address ?? ''}
         employeeName={selectedRecord?.purpose || 'Visit Location'}
         branchName={selectedRecord?.place_name || ''}
       />

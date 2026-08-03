@@ -1,8 +1,11 @@
 'use client'
+import Link from 'next/link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
+
+const EMPLOYEE_LOGIN_ERROR = 'This account is not allowed in the Employee Portal. Please use the admin login instead.'
 
 export default function PortalLoginPage() {
   const [email, setEmail] = useState('')
@@ -17,14 +20,29 @@ export default function PortalLoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) {
       setError('Invalid email or password. Please try again.')
       setLoading(false)
-    } else {
-      router.push('/portal')
-      router.refresh()
+      return
     }
+
+    const profileRes = await fetch('/api/portal/me', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    })
+
+    if (!profileRes.ok) {
+      await supabase.auth.signOut()
+      setError(EMPLOYEE_LOGIN_ERROR)
+      setLoading(false)
+      return
+    }
+
+    router.push('/portal')
+    router.refresh()
   }
 
   return (
@@ -54,16 +72,21 @@ export default function PortalLoginPage() {
               placeholder="you@company.com" required autoComplete="email" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-zinc-700">Password</label>
+              <Link href="/portal/forgot-password" className="text-xs font-medium text-zinc-900 hover:text-zinc-700">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="w-full pl-3 pr-10 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 required
-                autoComplete="new-password"
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -76,7 +99,7 @@ export default function PortalLoginPage() {
           </div>
           <button type="submit" disabled={loading}
             className="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors">
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
       </div>

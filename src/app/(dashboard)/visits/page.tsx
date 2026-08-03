@@ -1,14 +1,25 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { MapPin } from 'lucide-react'
-import MapModal from '@/components/ui/MapModal'
+import { Branch, Visit } from '@/types'
+
+const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
+  ssr: false,
+})
+
+type VisitRecord = Visit & {
+  employee?: Visit['employee'] & {
+    branch?: Branch | null
+  }
+}
 
 export default function VisitsPage() {
-  const [visits, setVisits] = useState<any[]>([])
-  const [branches, setBranches] = useState<any[]>([])
+  const [visits, setVisits] = useState<VisitRecord[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [branchFilter, setBranchFilter] = useState('')
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null)
+  const [selectedRecord, setSelectedRecord] = useState<VisitRecord | null>(null)
 
   useEffect(() => {
     fetch('/api/branches').then(r => r.json()).then(setBranches)
@@ -31,7 +42,7 @@ export default function VisitsPage() {
         <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
           className="px-3 py-2 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">All branches</option>
-          {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       </div>
 
@@ -41,7 +52,7 @@ export default function VisitsPage() {
             No visits recorded yet
           </div>
         )}
-        {visits.map((v: any) => (
+        {visits.map((v) => (
           <div key={v.id} className="bg-white border border-zinc-200 rounded-xl p-5">
             <div className="flex items-start justify-between">
               <div>
@@ -80,9 +91,9 @@ export default function VisitsPage() {
       <MapModal
         isOpen={!!selectedRecord}
         onClose={() => setSelectedRecord(null)}
-        lat={selectedRecord?.lat}
-        lng={selectedRecord?.lng}
-        address={selectedRecord?.address}
+        lat={selectedRecord?.lat ?? 0}
+        lng={selectedRecord?.lng ?? 0}
+        address={selectedRecord?.address ?? ''}
         employeeName={selectedRecord?.employee?.full_name || 'Employee Visit'}
         branchName={selectedRecord?.employee?.branch?.name || ''}
       />
