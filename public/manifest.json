@@ -1,7 +1,7 @@
 {
   "name": "Nire - Staff Management",
   "short_name": "Nire",
-  "id": "/",
+  "id": "/app",
   "description": "Employee tracking and management system for Nire",
   "start_url": "/app",
   "scope": "/",
