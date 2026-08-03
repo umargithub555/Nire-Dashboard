@@ -2,8 +2,8 @@
   "name": "Nire - Staff Management",
   "short_name": "Nire",
   "description": "Employee tracking and management system for Nire",
-  "start_url": "/portal",
-  "scope": "/portal",
+  "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#2563eb",
@@ -25,14 +25,19 @@
   ],
   "shortcuts": [
     {
-      "name": "Overview",
-      "url": "/",
-      "description": "Dashboard overview"
+      "name": "Choose Login",
+      "url": "/app",
+      "description": "Choose between admin and employee access"
     },
     {
-      "name": "My Portal",
-      "url": "/portal",
-      "description": "Employee self-service portal"
+      "name": "Admin Login",
+      "url": "/login",
+      "description": "Open the admin dashboard login"
+    },
+    {
+      "name": "Employee Login",
+      "url": "/portal/login",
+      "description": "Open the employee portal login"
     }
   ]
 }

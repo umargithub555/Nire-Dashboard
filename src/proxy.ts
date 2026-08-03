@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const adminPublicRoutes = ['/login', '/forgot-password', '/reset-password']
+const adminPublicRoutes = ['/app', '/login', '/forgot-password', '/reset-password']
 const portalPublicRoutes = ['/portal/login', '/portal/forgot-password', '/portal/reset-password']
 
 export default async function proxy(request: NextRequest) {
@@ -28,6 +28,10 @@ export default async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
+
+  if (!user && path === '/') {
+    return NextResponse.redirect(new URL('/app', request.url))
+  }
 
   if (path.startsWith('/portal')) {
     const isPortalPublicRoute = portalPublicRoutes.includes(path)

@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff } from 'lucide-react'
 
+const ADMIN_LOGIN_ERROR = 'This account is not allowed in the Admin Dashboard. Please use the employee portal instead.'
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,15 +21,30 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) {
       setError('Invalid email or password. Please try again.')
-      toast.error(error.message)
+      toast.error(signInError.message)
       setLoading(false)
-    } else {
-      router.push('/')
-      router.refresh()
+      return
     }
+
+    const profileRes = await fetch('/api/portal/me', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    })
+
+    if (profileRes.ok) {
+      await supabase.auth.signOut()
+      setError(ADMIN_LOGIN_ERROR)
+      setLoading(false)
+      return
+    }
+
+    router.push('/')
+    router.refresh()
   }
 
   return (

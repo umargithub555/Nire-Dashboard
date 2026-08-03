@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 
 const SESSION_DURATION_MINUTES = 30
 const authPages = new Set([
+  '/app',
   '/login',
   '/forgot-password',
   '/reset-password',
