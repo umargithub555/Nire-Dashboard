@@ -18,11 +18,17 @@ export default function SwRegister() {
     // ── Capture beforeinstallprompt as early as possible ──────────────────
     // Store the event globally so any component can retrieve it regardless
     // of when it mounts relative to when the browser fires the event.
+    type DeferredPromptEvent = Event & {
+      prompt: () => Promise<void>
+      userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
-      ;(window as Window & { __pwaPrompt?: Event }).__pwaPrompt = e
+      const prompt = e as DeferredPromptEvent
+      ;(window as Window & { __pwaPrompt?: DeferredPromptEvent }).__pwaPrompt = prompt
       // Dispatch a custom event so any already-mounted listeners are notified
-      window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: e }))
+      window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: prompt }))
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
