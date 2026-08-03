@@ -2,60 +2,76 @@
 import { useEffect } from 'react'
 
 /**
- * SwRegister is mounted in the root layout so it runs on every page.
+ * SwRegister — mounted in the root layout, runs on every page.
  *
- * It does two things:
- *  1. Registers the service worker on production so the PWA criteria are met.
- *  2. Captures the `beforeinstallprompt` event early and stores it on
- *     `window.__pwaPrompt` so that PwaInstallPrompt (which may mount later)
- *     can always retrieve it, even if the event fired before the component
- *     appeared in the tree.
+ * Responsibilities:
+ *  1. Capture `beforeinstallprompt` as early as possible and stash it on
+ *     `window.__pwaPrompt` so downstream components always find it regardless
+ *     of mount timing.  (The inline <script> in layout.tsx catches it even
+ *     earlier, before React loads at all.)
+ *  2. Register the service worker in production.
+ *  3. Detect when the SW takes control of the page for the first time
+ *     (`controllerchange`) and dispatch `sw-controlled` so components can
+ *     prompt the user to reload and let Chrome re-evaluate installability.
  */
 export default function SwRegister() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // ── Capture beforeinstallprompt as early as possible ──────────────────
-    // Store the event globally so any component can retrieve it regardless
-    // of when it mounts relative to when the browser fires the event.
     type DeferredPromptEvent = Event & {
       prompt: () => Promise<void>
       userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
     }
 
+    // ── Capture beforeinstallprompt (safety-net — inline script catches it
+    //    even earlier, but this handles the case where the event fires after
+    //    React hydrates and before this effect runs a second time).
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       const prompt = e as DeferredPromptEvent
       ;(window as Window & { __pwaPrompt?: DeferredPromptEvent }).__pwaPrompt = prompt
-      // Dispatch a custom event so any already-mounted listeners are notified
       window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: prompt }))
     }
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
 
-    // ── Service Worker registration ────────────────────────────────────────
-    if ('serviceWorker' in navigator) {
-      if (process.env.NODE_ENV === 'development') {
-        // In development unregister any stale service worker to prevent
-        // caching and HMR conflicts.
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const reg of registrations) {
-            reg.unregister().then((ok) => {
-              if (ok) console.log('[SW] Unregistered dev service worker')
-            })
-          }
-        })
-        return
-      }
-
-      navigator.serviceWorker
-        .register('/sw.js', { scope: '/' })
-        .then((reg) => console.log('[SW] Registered', reg.scope))
-        .catch((err) => console.error('[SW] Registration failed', err))
+    // ── Service Worker ────────────────────────────────────────────────────
+    if (!('serviceWorker' in navigator)) {
+      return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }
+
+    if (process.env.NODE_ENV === 'development') {
+      // In development, unregister stale SWs to prevent caching / HMR issues
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((reg) => reg.unregister().then((ok) => {
+          if (ok) console.log('[SW] Unregistered dev SW')
+        }))
+      })
+      return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
+
+    // Production: register the SW
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        console.log('[SW] Registered', reg.scope)
+      })
+      .catch((err) => console.error('[SW] Registration failed', err))
+
+    // Detect when the SW first takes control of this page.
+    // Chrome will only offer "Add to Home Screen / Install" once the SW
+    // is actively controlling the page.  On a brand-new install the SW
+    // doesn't control the page until it activates and calls clients.claim().
+    // We listen for `controllerchange` and dispatch a custom event so the
+    // install banner can tell the user to reload.
+    const handleControllerChange = () => {
+      console.log('[SW] Now controlling the page — reload to activate install prompt')
+      window.dispatchEvent(new Event('sw-controlled'))
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
     }
   }, [])
 
