@@ -20,14 +20,33 @@ export default function SessionGuard() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const isPortal = pathname.startsWith('/portal')
     if (authPages.has(pathname)) return
 
-    async function checkSession() {
+    async function validateSessionAndRole() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
+
       if (!session) return
+
+      const isPortal = pathname.startsWith('/portal')
+      const isAdminArea = !isPortal
+
+      const portalProfileRes = await fetch('/api/portal/me', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      })
+
+      if (isPortal && !portalProfileRes.ok) {
+        router.replace('/login')
+        return
+      }
+
+      if (isAdminArea && portalProfileRes.ok) {
+        router.replace('/portal')
+        return
+      }
 
       const loginTime = session.user.last_sign_in_at
       if (!loginTime) return
@@ -36,11 +55,27 @@ export default function SessionGuard() {
 
       if (minutesSinceLogin > SESSION_DURATION_MINUTES) {
         await supabase.auth.signOut()
-        router.push(isPortal ? '/portal/login' : '/login')
+        router.replace(isPortal ? '/portal/login' : '/login')
       }
     }
 
-    void checkSession()
+    void validateSessionAndRole()
+
+    const handlePageShow = () => {
+      void validateSessionAndRole()
+    }
+
+    const handleFocus = () => {
+      void validateSessionAndRole()
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [pathname, router, supabase.auth])
 
   return null

@@ -1,10 +1,13 @@
 import Link from 'next/link'
 import { ArrowRight, Shield, Users } from 'lucide-react'
+import PwaInstallPrompt from '@/components/pwa/PwaInstallPrompt'
 
 export default function AppChooserPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#f8fafc_38%,_#f4f4f5_100%)] flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
+        <PwaInstallPrompt />
+
         <div className="text-center mb-8 lg:mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200/70 mb-4">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
