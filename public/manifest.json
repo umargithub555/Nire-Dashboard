@@ -1,6 +1,7 @@
 {
   "name": "Nire - Staff Management",
   "short_name": "Nire",
+  "id": "/app",
   "description": "Employee tracking and management system for Nire",
   "start_url": "/app",
   "scope": "/",
@@ -31,12 +32,12 @@
     },
     {
       "name": "Admin Login",
-      "url": "/login",
+      "url": "/login?entry=app",
       "description": "Open the admin dashboard login"
     },
     {
       "name": "Employee Login",
-      "url": "/portal/login",
+      "url": "/portal/login?entry=app",
       "description": "Open the employee portal login"
     }
   ]

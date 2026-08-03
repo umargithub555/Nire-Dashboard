@@ -1,11 +1,16 @@
 'use client'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 
 const EMPLOYEE_LOGIN_ERROR = 'This account is not allowed in the Employee Portal. Please use the admin login instead.'
+
+function isStandaloneMode() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: window-controls-overlay)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+}
 
 export default function PortalLoginPage() {
   const [email, setEmail] = useState('')
@@ -15,6 +20,21 @@ export default function PortalLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (!isStandaloneMode()) return
+
+    const currentUrl = new URL(window.location.href)
+    const entry = currentUrl.searchParams.get('entry')
+
+    if (entry !== 'app') {
+      router.replace('/app')
+      return
+    }
+
+    currentUrl.searchParams.delete('entry')
+    window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search)
+  }, [router])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()

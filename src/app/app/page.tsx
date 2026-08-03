@@ -25,7 +25,7 @@ export default function AppChooserPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <Link
-            href="/login"
+            href="/login?entry=app"
             className="group bg-white/95 border border-blue-100 rounded-3xl p-6 lg:p-8 shadow-[0_20px_60px_-30px_rgba(37,99,235,0.45)] hover:-translate-y-1 transition-all"
           >
             <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-5">
@@ -46,7 +46,7 @@ export default function AppChooserPage() {
           </Link>
 
           <Link
-            href="/portal/login"
+            href="/portal/login?entry=app"
             className="group bg-white/95 border border-zinc-200 rounded-3xl p-6 lg:p-8 shadow-[0_20px_60px_-30px_rgba(24,24,27,0.22)] hover:-translate-y-1 transition-all"
           >
             <div className="w-12 h-12 rounded-2xl bg-zinc-900 text-white flex items-center justify-center mb-5">
