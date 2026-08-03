@@ -1,64 +1,23 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Download, Share2, Smartphone } from 'lucide-react'
+import { usePwaInstall } from '@/hooks/usePwaInstall'
 
-type DeferredPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-function isIosDevice() {
+function isIosDevice(): boolean {
   if (typeof navigator === 'undefined') return false
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
-function isStandaloneMode() {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-}
-
 export default function PwaInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<DeferredPromptEvent | null>(null)
-  const [dismissed, setDismissed] = useState(false)
-  const [installed, setInstalled] = useState(false)
-  const [installing, setInstalling] = useState(false)
-
-  useEffect(() => {
-    setInstalled(isStandaloneMode())
-
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault()
-      setDeferredPrompt(event as DeferredPromptEvent)
-    }
-
-    const handleInstalled = () => {
-      setInstalled(true)
-      setDeferredPrompt(null)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.addEventListener('appinstalled', handleInstalled)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', handleInstalled)
-    }
-  }, [])
+  const { deferredPrompt, dismissed, installed, installing, handleInstall, handleDismiss } =
+    usePwaInstall()
 
   const ios = useMemo(() => isIosDevice(), [])
 
-  async function handleInstall() {
-    if (!deferredPrompt) return
-
-    setInstalling(true)
-    await deferredPrompt.prompt()
-    await deferredPrompt.userChoice
-    setDeferredPrompt(null)
-    setInstalling(false)
-  }
-
+  // Don't show anything if the user already installed the PWA or dismissed the banner
   if (installed || dismissed) return null
 
+  // Android / Chrome / Edge — native install prompt is available
   if (deferredPrompt) {
     return (
       <div className="mb-6 rounded-3xl border border-emerald-200 bg-white/95 p-4 lg:p-5 shadow-[0_20px_60px_-35px_rgba(16,185,129,0.5)]">
@@ -79,11 +38,11 @@ export default function PwaInstallPrompt() {
                 className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
               >
                 <Download size={16} />
-                {installing ? 'Preparing...' : 'Install app'}
+                {installing ? 'Preparing…' : 'Install app'}
               </button>
               <button
                 type="button"
-                onClick={() => setDismissed(true)}
+                onClick={handleDismiss}
                 className="inline-flex items-center rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
               >
                 Maybe later
@@ -95,6 +54,7 @@ export default function PwaInstallPrompt() {
     )
   }
 
+  // iOS — native prompt is not supported; show manual instructions
   if (ios) {
     return (
       <div className="mb-6 rounded-3xl border border-amber-200 bg-white/95 p-4 lg:p-5 shadow-[0_20px_60px_-35px_rgba(245,158,11,0.35)]">
@@ -105,11 +65,14 @@ export default function PwaInstallPrompt() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-zinc-900">Install on iPhone or iPad</div>
             <p className="mt-1 text-sm leading-6 text-zinc-500">
-              Open the browser share menu, then choose <span className="font-medium text-zinc-700">Add to Home Screen</span> to install Nire.
+              Tap the{' '}
+              <span className="font-medium text-zinc-700">Share</span> button in your browser, then
+              choose{' '}
+              <span className="font-medium text-zinc-700">Add to Home Screen</span> to install Nire.
             </p>
             <button
               type="button"
-              onClick={() => setDismissed(true)}
+              onClick={handleDismiss}
               className="mt-4 inline-flex items-center rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
             >
               Dismiss
@@ -120,6 +83,7 @@ export default function PwaInstallPrompt() {
     )
   }
 
+  // Other browsers — generic instructions
   return (
     <div className="mb-6 rounded-3xl border border-zinc-200 bg-white/95 p-4 lg:p-5 shadow-[0_20px_60px_-35px_rgba(24,24,27,0.2)]">
       <div className="flex items-start gap-3">
@@ -129,11 +93,12 @@ export default function PwaInstallPrompt() {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-zinc-900">Install Nire</div>
           <p className="mt-1 text-sm leading-6 text-zinc-500">
-            If your browser supports app installs, use the browser menu to install Nire to your home screen.
+            If your browser supports app installs, use the browser menu to install Nire to your
+            home screen.
           </p>
           <button
             type="button"
-            onClick={() => setDismissed(true)}
+            onClick={handleDismiss}
             className="mt-4 inline-flex items-center rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
           >
             Dismiss
