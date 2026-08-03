@@ -5,7 +5,7 @@ import SwRegister from '@/components/SwRegister'
 import SessionGuard from '@/components/SessionGuard'
 
 export const metadata: Metadata = {
-  title: 'Nire — Staff Management',
+  title: 'Nire - Staff Management',
   description: 'Employee tracking and management system',
   manifest: '/manifest.json',
   appleWebApp: {
@@ -27,7 +27,6 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
@@ -46,19 +45,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
-
-
-
-
-
-// export default function RootLayout({ children }: { children: React.ReactNode }) {
-//   return (
-//     <html lang="en" data-scroll-behavior="smooth">
-//       <body>
-//         {children}
-//         <Toaster position="top-right" />
-//         <SwRegister />
-//       </body>
-//     </html>
-//   )
-// }

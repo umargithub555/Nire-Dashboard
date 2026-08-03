@@ -1,15 +1,26 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { MapPin, Clock } from 'lucide-react'
-import MapModal from '@/components/ui/MapModal'
+import { Attendance, Branch } from '@/types'
+
+const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
+  ssr: false,
+})
+
+type AttendanceRecord = Attendance & {
+  employee?: Attendance['employee'] & {
+    branch?: Branch | null
+  }
+}
 
 export default function AttendancePage() {
-  const [attendance, setAttendance] = useState<any[]>([])
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [branchFilter, setBranchFilter] = useState('')
-  const [branches, setBranches] = useState<any[]>([])
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null)
+  const [branchFilter, setBranchFilter] = useState<string>('')
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
 
   useEffect(() => {
     fetch('/api/branches').then(r => r.json()).then(setBranches)
@@ -29,10 +40,10 @@ export default function AttendancePage() {
           Attendance
         </h1>
         <p className="text-sm text-zinc-500 mt-0.5">
-          {attendance.length} check-ins on{" "}
+          {attendance.length} check-ins on{' '}
           {format(
-            new Date(date + "T00:00:00"),
-            "MMMM d, yyyy"
+            new Date(date + 'T00:00:00'),
+            'MMMM d, yyyy'
           )}
         </p>
       </div>
@@ -51,7 +62,7 @@ export default function AttendancePage() {
           className="w-full sm:w-auto px-3 py-2 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           <option value="">All branches</option>
-          {branches.map((b: any) => (
+          {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
@@ -59,7 +70,6 @@ export default function AttendancePage() {
         </select>
       </div>
 
-      {/* Desktop table view */}
       <div className="hidden lg:block bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -91,7 +101,7 @@ export default function AttendancePage() {
               </tr>
             )}
 
-            {attendance.map((a: any) => (
+            {attendance.map((a) => (
               <tr
                 key={a.id}
                 className="hover:bg-zinc-50 transition-colors"
@@ -112,7 +122,7 @@ export default function AttendancePage() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-1.5 text-zinc-700">
                     <Clock size={13} className="text-zinc-400" />
-                    {format(new Date(a.clock_in_at), "hh:mm a")}
+                    {format(new Date(a.clock_in_at), 'hh:mm a')}
                   </div>
                 </td>
 
@@ -152,7 +162,6 @@ export default function AttendancePage() {
         </table>
       </div>
 
-      {/* Mobile card view */}
       <div className="lg:hidden space-y-3">
         {attendance.length === 0 && (
           <div className="bg-white border border-zinc-200 rounded-xl py-10 text-center text-sm text-zinc-400">
@@ -160,7 +169,7 @@ export default function AttendancePage() {
           </div>
         )}
 
-        {attendance.map((a: any) => (
+        {attendance.map((a) => (
           <div
             key={a.id}
             className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm space-y-3"
@@ -178,7 +187,7 @@ export default function AttendancePage() {
               <div className="text-right shrink-0">
                 <div className="flex items-center gap-1 text-xs font-semibold text-zinc-700 justify-end">
                   <Clock size={12} className="text-zinc-400" />
-                  {format(new Date(a.clock_in_at), "hh:mm a")}
+                  {format(new Date(a.clock_in_at), 'hh:mm a')}
                 </div>
 
                 <div className="text-[10px] text-zinc-400 mt-0.5">
@@ -219,11 +228,11 @@ export default function AttendancePage() {
     <MapModal
       isOpen={!!selectedRecord}
       onClose={() => setSelectedRecord(null)}
-      lat={selectedRecord?.clock_in_lat}
-      lng={selectedRecord?.clock_in_lng}
-      address={selectedRecord?.clock_in_address}
-      employeeName={selectedRecord?.employee?.full_name}
-      branchName={selectedRecord?.employee?.branch?.name}
+      lat={selectedRecord?.clock_in_lat ?? 0}
+      lng={selectedRecord?.clock_in_lng ?? 0}
+      address={selectedRecord?.clock_in_address ?? ''}
+      employeeName={selectedRecord?.employee?.full_name ?? 'Employee'}
+      branchName={selectedRecord?.employee?.branch?.name ?? 'Branch'}
     />
   </>
 )

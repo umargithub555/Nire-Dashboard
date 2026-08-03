@@ -1,6 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { Users, Building2, ClipboardCheck, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
+import { Attendance } from '@/types'
+
+type RecentAttendance = Attendance & {
+  employee?: Attendance['employee']
+}
 
 async function getStats() {
   const service = createServiceClient()
@@ -50,7 +55,6 @@ export default async function OverviewPage() {
         <p className="text-sm text-zinc-500 mt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </div>
 
-      {/* Stat cards — 2 cols on mobile, 4 on desktop */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white border border-zinc-200 rounded-xl p-4 lg:p-5">
@@ -64,20 +68,19 @@ export default async function OverviewPage() {
         ))}
       </div>
 
-      {/* Today's attendance */}
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-4 lg:px-6 py-4 border-b border-zinc-100">
-          <h2 className="font-medium text-zinc-900">Today's attendance</h2>
+          <h2 className="font-medium text-zinc-900">Today&apos;s attendance</h2>
         </div>
         <div className="divide-y divide-zinc-50">
           {attendance.length === 0 && (
             <div className="px-4 lg:px-6 py-8 text-center text-sm text-zinc-400">No check-ins yet today</div>
           )}
-          {attendance.map((a: any) => (
+          {attendance.map((a: RecentAttendance) => (
             <div key={a.id} className="px-4 lg:px-6 py-3 lg:py-3.5 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-zinc-800 truncate">{a.employee?.full_name}</div>
-                <div className="text-xs text-zinc-400 truncate">{a.employee?.designation} · {a.employee?.branch?.name}</div>
+                <div className="text-xs text-zinc-400 truncate">{a.employee?.designation} - {a.employee?.branch?.name}</div>
               </div>
               <div className="text-right shrink-0">
                 <div className="text-sm text-zinc-700">{format(new Date(a.clock_in_at), 'hh:mm a')}</div>
