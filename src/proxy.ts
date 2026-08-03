@@ -50,7 +50,6 @@ export default async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isApiRoute = path.startsWith('/api/')
   const isPortalRoute = path.startsWith('/portal') || path.startsWith('/api/portal')
-  const isPortalUiRoute = path.startsWith('/portal')
   const isPortalPublicRoute = portalPublicRoutes.includes(path)
   const isAdminPublicRoute = adminPublicRoutes.includes(path)
   const isPortalResetRoute = path === '/portal/reset-password'
@@ -113,5 +112,7 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|json|woff|woff2)$).*)',
+  ],
 }
