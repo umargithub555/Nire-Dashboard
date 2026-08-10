@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
@@ -13,7 +13,7 @@ function isStandaloneMode() {
   return window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: window-controls-overlay)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
 }
 
-export default function PortalLoginPage() {
+function PortalLoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,13 +30,10 @@ export default function PortalLoginPage() {
     const currentUrl = new URL(window.location.href)
     const entry = currentUrl.searchParams.get('entry')
 
-    if (entry !== 'app') {
-      router.replace('/app')
-      return
+    if (entry === 'app') {
+      currentUrl.searchParams.delete('entry')
+      window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search)
     }
-
-    currentUrl.searchParams.delete('entry')
-    window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search)
   }, [router])
 
   async function handleLogin(e: React.FormEvent) {
@@ -135,5 +132,13 @@ export default function PortalLoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function PortalLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50" />}>
+      <PortalLoginContent />
+    </Suspense>
   )
 }

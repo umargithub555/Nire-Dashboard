@@ -107,12 +107,12 @@ export async function POST(req: Request) {
 
   const { id: empId, branch_id: branchId } = emp.data
   const items = Array.isArray(body.items) ? body.items : []
-  const validItems = items
+  const normalizedItems: Array<{ title: string; amount: number }> = items
     .map((item: { title?: string; amount?: number }) => ({
       title: item.title?.trim() ?? '',
       amount: Number(item.amount),
     }))
-    .filter((item) => item.title && Number.isFinite(item.amount) && item.amount > 0)
+  const validItems = normalizedItems.filter((item) => item.title && Number.isFinite(item.amount) && item.amount > 0)
 
   if (validItems.length === 0) {
     return NextResponse.json({ error: 'Add at least one expense item with a valid amount.' }, { status: 400 })
