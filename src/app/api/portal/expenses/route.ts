@@ -64,10 +64,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const service = createServiceClient()
-  const emp = await service.from('employees').select('id, branch_id').eq('auth_user_id', user.id).maybeSingle()
+  const emp = await service.from('employees').select('id, branch_id, is_active').eq('auth_user_id', user.id).maybeSingle()
   
   if (emp.error) return NextResponse.json({ error: emp.error.message }, { status: 500 })
   if (!emp.data) return NextResponse.json({ error: 'Employee profile not found' }, { status: 404 })
+  if (!emp.data.is_active) return NextResponse.json({ error: 'Your account is inactive. Please contact admin.' }, { status: 403 })
 
   // Destructure and localise variables here. 
   // TypeScript now guarantees these are not null/undefined for the rest of the execution.
@@ -98,23 +99,36 @@ export async function POST(req: Request) {
 
   const body = await req.json()
   const service = createServiceClient()
-  const emp = await service.from('employees').select('id, branch_id').eq('auth_user_id', user.id).maybeSingle()
+  const emp = await service.from('employees').select('id, branch_id, is_active').eq('auth_user_id', user.id).maybeSingle()
   
   if (emp.error) return NextResponse.json({ error: emp.error.message }, { status: 500 })
   if (!emp.data) return NextResponse.json({ error: 'Employee profile not found' }, { status: 404 })
+  if (!emp.data.is_active) return NextResponse.json({ error: 'Your account is inactive. Please contact admin.' }, { status: 403 })
 
-  // Destructure here as well
   const { id: empId, branch_id: branchId } = emp.data
+  const items = Array.isArray(body.items) ? body.items : []
+  const validItems = items
+    .map((item: { title?: string; amount?: number }) => ({
+      title: item.title?.trim() ?? '',
+      amount: Number(item.amount),
+    }))
+    .filter((item) => item.title && Number.isFinite(item.amount) && item.amount > 0)
 
-  const { data, error } = await service.from('expenses').insert({
+  if (validItems.length === 0) {
+    return NextResponse.json({ error: 'Add at least one expense item with a valid amount.' }, { status: 400 })
+  }
+
+  const payload = validItems.map((item) => ({
     employee_id: empId,
     branch_id: branchId,
-    title: body.title,
-    amount: body.amount,
+    title: item.title,
+    amount: item.amount,
     category: body.category ?? 'food',
-    description: body.description,
+    description: body.description?.trim() || null,
     expense_date: body.expense_date ?? new Date().toISOString().split('T')[0],
-  }).select().single()
+  }))
+
+  const { data, error } = await service.from('expenses').insert(payload).select()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)

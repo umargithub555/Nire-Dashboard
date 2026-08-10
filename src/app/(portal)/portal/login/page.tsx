@@ -2,10 +2,11 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 
 const EMPLOYEE_LOGIN_ERROR = 'This account is not allowed in the Employee Portal. Please use the admin login instead.'
+const INACTIVE_LOGIN_ERROR = 'Your account is inactive. Please contact admin.'
 
 function isStandaloneMode() {
   if (typeof window === 'undefined') return false
@@ -19,7 +20,9 @@ export default function PortalLoginPage() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const inactiveError = searchParams.get('inactive') === '1' ? INACTIVE_LOGIN_ERROR : ''
 
   useEffect(() => {
     if (!isStandaloneMode()) return
@@ -53,6 +56,14 @@ export default function PortalLoginPage() {
       credentials: 'include',
       cache: 'no-store',
     })
+    const profile = await profileRes.json().catch(() => null)
+
+    if (profileRes.status === 403 && profile?.error === INACTIVE_LOGIN_ERROR) {
+      await supabase.auth.signOut()
+      setError(INACTIVE_LOGIN_ERROR)
+      setLoading(false)
+      return
+    }
 
     if (!profileRes.ok) {
       await supabase.auth.signOut()
@@ -80,9 +91,9 @@ export default function PortalLoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4">
-          {error && (
+          {(error || inactiveError) && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
-              {error}
+              {error || inactiveError}
             </div>
           )}
           <div>

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 
 const SESSION_DURATION_MINUTES = 30
+const INACTIVE_ACCOUNT_ERROR = 'Your account is inactive. Please contact admin.'
 const authPages = new Set([
   '/app',
   '/login',
@@ -30,20 +31,25 @@ export default function SessionGuard() {
       if (!session) return
 
       const isPortal = pathname.startsWith('/portal')
-      const isAdminArea = !isPortal
-
       const portalProfileRes = await fetch('/api/portal/me', {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
       })
+      const portalPayload = await portalProfileRes.json().catch(() => null)
 
-      if (isPortal && !portalProfileRes.ok) {
-        router.replace('/login')
+      if (portalProfileRes.status === 403 && portalPayload?.error === INACTIVE_ACCOUNT_ERROR) {
+        await supabase.auth.signOut()
+        router.replace('/portal/login?inactive=1')
         return
       }
 
-      if (isAdminArea && portalProfileRes.ok) {
+      if (isPortal && !portalProfileRes.ok) {
+        router.replace('/portal/login')
+        return
+      }
+
+      if (!isPortal && portalProfileRes.ok) {
         router.replace('/portal')
         return
       }

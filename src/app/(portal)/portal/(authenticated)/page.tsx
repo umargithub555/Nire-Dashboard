@@ -1,15 +1,29 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { ClipboardCheck, MapPin, Receipt, Clock } from 'lucide-react'
+import { ClipboardCheck, MapPin, Receipt, Clock, LogOut } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Attendance, Expense } from '@/types'
+
+type Profile = {
+  full_name: string
+}
+
+type VisitRecord = {
+  id: string
+}
+
+type PortalExpense = Expense & {
+  is_own: boolean
+}
 
 export default function PortalOverviewPage() {
-  const [profile, setProfile] = useState<any>(null)
-  const [attendance, setAttendance] = useState<any[]>([])
-  const [visits, setVisits] = useState<any[]>([])
-  const [expenses, setExpenses] = useState<any[]>([])
-  const [checkedInToday, setCheckedInToday] = useState(false)
-  const [checkingIn, setCheckingIn] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [attendance, setAttendance] = useState<Attendance[]>([])
+  const [visits, setVisits] = useState<VisitRecord[]>([])
+  const [expenses, setExpenses] = useState<PortalExpense[]>([])
+  const [attendanceAction, setAttendanceAction] = useState<'checkin' | 'checkout' | null>(null)
   const [locationStatus, setLocationStatus] = useState('')
   const [profileError, setProfileError] = useState<string | null>(null)
 
@@ -22,31 +36,34 @@ export default function PortalOverviewPage() {
     ]).then(([prof, att, vis, exp]) => {
       if (prof.error) { setProfileError(prof.error); return }
       setProfile(prof)
-      const validAtt = Array.isArray(att) ? att : []
-      const validVis = Array.isArray(vis) ? vis : []
-      const validExp = exp && Array.isArray(exp.expenses) ? exp.expenses : []
-      setAttendance(validAtt)
-      setVisits(validVis)
-      setExpenses(validExp)
-      const today = format(new Date(), 'yyyy-MM-dd')
-      setCheckedInToday(validAtt.some((a: any) => a.date === today))
+      setAttendance(Array.isArray(att) ? att : [])
+      setVisits(Array.isArray(vis) ? vis : [])
+      setExpenses(exp && Array.isArray(exp.expenses) ? exp.expenses : [])
     }).catch(err => {
       setProfileError('Failed to load portal data')
       console.error(err)
     })
   }, [])
 
-  async function handleCheckIn() {
-    setCheckingIn(true)
-    setLocationStatus('Getting your location…')
+  async function refreshAttendance() {
+    const att = await fetch('/api/portal/attendance').then(r => r.json())
+    setAttendance(Array.isArray(att) ? att : [])
+  }
+
+  async function handleAttendance(action: 'checkin' | 'checkout') {
+    setAttendanceAction(action)
+    setLocationStatus(`Getting your location for ${action === 'checkin' ? 'check-in' : 'check-out'}...`)
+
     if (!navigator.geolocation) {
       setLocationStatus('Geolocation not supported by your browser')
-      setCheckingIn(false)
+      setAttendanceAction(null)
       return
     }
+
     navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude: lat, longitude: lng } = pos.coords
-      setLocationStatus('Got location, checking in…')
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords
+      setLocationStatus(`Resolving your ${action === 'checkin' ? 'check-in' : 'check-out'} location...`)
+
       let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
       try {
         const geo = await fetch(
@@ -54,24 +71,26 @@ export default function PortalOverviewPage() {
         ).then(r => r.json())
         if (geo.display_name) address = geo.display_name
       } catch {}
+
       const res = await fetch('/api/portal/attendance', {
-        method: 'POST',
+        method: action === 'checkin' ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, address }),
+        body: JSON.stringify({ lat, lng, address, accuracy }),
       })
+
       if (res.ok) {
-        setCheckedInToday(true)
         setLocationStatus('')
-        const att = await fetch('/api/portal/attendance').then(r => r.json())
-        setAttendance(Array.isArray(att) ? att : [])
+        await refreshAttendance()
+        toast.success(action === 'checkin' ? 'Checked in successfully' : 'Checked out successfully')
       } else {
         const err = await res.json()
-        setLocationStatus(err.error ?? 'Check-in failed')
+        setLocationStatus(err.error ?? 'Attendance update failed')
       }
-      setCheckingIn(false)
+
+      setAttendanceAction(null)
     }, () => {
       setLocationStatus('Location access denied. Please allow location in browser.')
-      setCheckingIn(false)
+      setAttendanceAction(null)
     }, { enableHighAccuracy: true, timeout: 10000 })
   }
 
@@ -91,18 +110,20 @@ export default function PortalOverviewPage() {
             : profileError}
         </p>
         {profileError === 'Employee profile not found' && (
-          <a href="/" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all hover:scale-[1.02] active:scale-95">
+          <Link href="/" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all hover:scale-[1.02] active:scale-95">
             Go to Admin Dashboard
-          </a>
+          </Link>
         )}
       </div>
     )
   }
 
   const today = format(new Date(), 'yyyy-MM-dd')
-  const todayRecord = attendance.find((a: any) => a.date === today)
-  const myExpenses = expenses.filter((e: any) => e.is_own)
-  const totalSpent = myExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
+  const todayRecord = attendance.find((record) => record.date === today)
+  const checkedInToday = !!todayRecord
+  const checkedOutToday = !!todayRecord?.clock_out_at
+  const myExpenses = expenses.filter((expense) => expense.is_own)
+  const totalSpent = myExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
   return (
     <div className="space-y-5 lg:space-y-8">
@@ -113,22 +134,34 @@ export default function PortalOverviewPage() {
         <p className="text-sm text-zinc-500 mt-0.5">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </div>
 
-      {/* Check-in card */}
       <div className={`rounded-xl border p-4 lg:p-5 flex items-center justify-between gap-4 ${
-        checkedInToday ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200'
+        checkedOutToday ? 'bg-emerald-50 border-emerald-200' : checkedInToday ? 'bg-amber-50 border-amber-200' : 'bg-white border-zinc-200'
       }`}>
         <div className="min-w-0">
           <div className="font-medium text-zinc-900 text-sm lg:text-base">
-            {checkedInToday ? 'Checked in today ✓' : 'Not checked in yet'}
+            {checkedOutToday ? 'Attendance completed for today' : checkedInToday ? 'Checked in, check-out pending' : 'Not checked in yet'}
           </div>
           {todayRecord ? (
-            <div className="text-xs lg:text-sm text-zinc-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-              <Clock size={12} />
-              {format(new Date(todayRecord.clock_in_at), 'hh:mm a')}
-              {todayRecord.clock_in_address && (
-                <span className="truncate max-w-[200px] lg:max-w-[260px]">
-                  · {todayRecord.clock_in_address.split(',').slice(0, 2).join(',')}
-                </span>
+            <div className="space-y-1.5 text-xs lg:text-sm text-zinc-500 mt-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Clock size={12} />
+                <span>Check-in {format(new Date(todayRecord.clock_in_at), 'hh:mm a')}</span>
+                {todayRecord.clock_in_address && (
+                  <span className="truncate max-w-[200px] lg:max-w-[260px]">
+                    at {todayRecord.clock_in_address.split(',').slice(0, 2).join(',')}
+                  </span>
+                )}
+              </div>
+              {todayRecord.clock_out_at && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <LogOut size={12} />
+                  <span>Check-out {format(new Date(todayRecord.clock_out_at), 'hh:mm a')}</span>
+                  {todayRecord.clock_out_address && (
+                    <span className="truncate max-w-[200px] lg:max-w-[260px]">
+                      at {todayRecord.clock_out_address.split(',').slice(0, 2).join(',')}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           ) : (
@@ -136,17 +169,24 @@ export default function PortalOverviewPage() {
               {locationStatus || 'Tap to mark attendance with your location'}
             </div>
           )}
-          {locationStatus && !checkedInToday && (
+          {locationStatus && !checkedOutToday && (
             <div className="text-xs text-zinc-500 mt-1">{locationStatus}</div>
           )}
         </div>
+
         {!checkedInToday && (
-          <button onClick={handleCheckIn} disabled={checkingIn}
+          <button onClick={() => handleAttendance('checkin')} disabled={attendanceAction !== null}
             className="px-3 lg:px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors shrink-0 active:scale-95">
-            {checkingIn ? 'Checking…' : 'Check in'}
+            {attendanceAction === 'checkin' ? 'Checking in...' : 'Check in'}
           </button>
         )}
-        {checkedInToday && (
+        {checkedInToday && !checkedOutToday && (
+          <button onClick={() => handleAttendance('checkout')} disabled={attendanceAction !== null}
+            className="px-3 lg:px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors shrink-0 active:scale-95">
+            {attendanceAction === 'checkout' ? 'Checking out...' : 'Check out'}
+          </button>
+        )}
+        {checkedOutToday && (
           <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -155,7 +195,6 @@ export default function PortalOverviewPage() {
         )}
       </div>
 
-      {/* Stat cards — 1 col on mobile, 3 on desktop */}
       <div className="grid grid-cols-3 gap-3 lg:gap-4">
         {[
           { label: 'Days present', value: attendance.length, icon: ClipboardCheck, color: 'bg-blue-50 text-blue-600' },
@@ -173,17 +212,19 @@ export default function PortalOverviewPage() {
         ))}
       </div>
 
-      {/* Recent attendance */}
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-4 lg:px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
           <h2 className="font-medium text-zinc-900 text-sm lg:text-base">Recent attendance</h2>
-          <a href="/portal/attendance" className="text-xs text-blue-600 hover:underline">View all</a>
+          <Link href="/portal/attendance" className="text-xs text-blue-600 hover:underline">View all</Link>
         </div>
         <div className="divide-y divide-zinc-50">
-          {attendance.slice(0, 7).map((a: any) => (
-            <div key={a.id} className="px-4 lg:px-6 py-3 flex items-center justify-between">
-              <div className="text-sm text-zinc-700">{format(new Date(a.date + 'T00:00:00'), 'EEE, MMM d')}</div>
-              <div className="text-sm text-zinc-500">{format(new Date(a.clock_in_at), 'hh:mm a')}</div>
+          {attendance.slice(0, 7).map((record) => (
+            <div key={record.id} className="px-4 lg:px-6 py-3 flex items-center justify-between">
+              <div className="text-sm text-zinc-700">{format(new Date(record.date + 'T00:00:00'), 'EEE, MMM d')}</div>
+              <div className="text-sm text-zinc-500">
+                {format(new Date(record.clock_in_at), 'hh:mm a')}
+                {record.clock_out_at ? ` - ${format(new Date(record.clock_out_at), 'hh:mm a')}` : ''}
+              </div>
             </div>
           ))}
           {attendance.length === 0 && (

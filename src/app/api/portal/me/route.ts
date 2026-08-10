@@ -15,6 +15,7 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Employee profile not found' }, { status: 404 })
+  if (!data.is_active) return NextResponse.json({ error: 'Your account is inactive. Please contact admin.' }, { status: 403 })
   return NextResponse.json(data)
 }
 

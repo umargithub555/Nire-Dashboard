@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { Eye, EyeOff } from 'lucide-react'
 
 const ADMIN_LOGIN_ERROR = 'This account is not allowed in the Admin Dashboard. Please use the employee portal instead.'
+const INACTIVE_LOGIN_ERROR = 'Your account is inactive. Please contact admin.'
 
 function isStandaloneMode() {
   if (typeof window === 'undefined') return false
@@ -55,6 +56,14 @@ export default function LoginPage() {
       credentials: 'include',
       cache: 'no-store',
     })
+    const profile = await profileRes.json().catch(() => null)
+
+    if (profileRes.status === 403 && profile?.error === INACTIVE_LOGIN_ERROR) {
+      await supabase.auth.signOut()
+      setError(INACTIVE_LOGIN_ERROR)
+      setLoading(false)
+      return
+    }
 
     if (profileRes.ok) {
       await supabase.auth.signOut()
