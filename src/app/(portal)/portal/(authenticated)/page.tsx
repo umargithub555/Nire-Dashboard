@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ClipboardCheck, MapPin, Receipt, Clock, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Attendance, Expense } from '@/types'
+import { captureBestLocation } from '@/lib/location'
 
 type Profile = {
   full_name: string
@@ -60,8 +61,15 @@ export default function PortalOverviewPage() {
       return
     }
 
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude: lat, longitude: lng, accuracy } = pos.coords
+    try {
+      const { lat, lng, accuracy } = await captureBestLocation({
+        desiredAccuracyMeters: 50,
+        maxWaitMs: 18000,
+        onUpdate: (meters) => {
+          setLocationStatus(`Improving location accuracy... best so far ${meters}m`)
+        },
+      })
+
       setLocationStatus(`Resolving your ${action === 'checkin' ? 'check-in' : 'check-out'} location...`)
 
       let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
@@ -81,17 +89,18 @@ export default function PortalOverviewPage() {
       if (res.ok) {
         setLocationStatus('')
         await refreshAttendance()
-        toast.success(action === 'checkin' ? 'Checked in successfully' : 'Checked out successfully')
+        const accuracyText = Number.isFinite(accuracy) ? ` (${Math.round(accuracy)}m accuracy)` : ''
+        toast.success(`${action === 'checkin' ? 'Checked in successfully' : 'Checked out successfully'}${accuracyText}`)
       } else {
         const err = await res.json()
         setLocationStatus(err.error ?? 'Attendance update failed')
       }
 
       setAttendanceAction(null)
-    }, () => {
-      setLocationStatus('Location access denied. Please allow location in browser.')
+    } catch (error) {
+      setLocationStatus(error instanceof Error ? error.message : 'Location access denied. Please allow location in browser.')
       setAttendanceAction(null)
-    }, { enableHighAccuracy: true, timeout: 10000 })
+    }
   }
 
   if (profileError) {

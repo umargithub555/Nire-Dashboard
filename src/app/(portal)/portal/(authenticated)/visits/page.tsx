@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { MapPin, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Visit } from '@/types'
+import { captureBestLocation } from '@/lib/location'
 
 const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
   ssr: false,
@@ -38,21 +39,23 @@ export default function PortalVisitsPage() {
 
   function captureLocation() {
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude: lat, longitude: lng } = pos.coords
-      let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-      try {
-        const geo = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
-        ).then(r => r.json())
-        if (geo.display_name) address = geo.display_name
-      } catch {}
-      setForm(f => ({ ...f, lat: String(lat), lng: String(lng), address }))
-      setLocating(false)
-    }, () => {
-      toast.error('Could not get location. Please allow location access.')
-      setLocating(false)
-    }, { enableHighAccuracy: true })
+    captureBestLocation({ desiredAccuracyMeters: 50, maxWaitMs: 18000 })
+      .then(async ({ lat, lng, accuracy }) => {
+        let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+        try {
+          const geo = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+          ).then(r => r.json())
+          if (geo.display_name) address = geo.display_name
+        } catch {}
+        setForm(f => ({ ...f, lat: String(lat), lng: String(lng), address }))
+        toast.success(`Location captured (${Math.round(accuracy)}m accuracy)`)
+        setLocating(false)
+      })
+      .catch(() => {
+        toast.error('Could not get location. Please allow location access and turn on precise location.')
+        setLocating(false)
+      })
   }
 
   async function handleSubmit(e: React.FormEvent) {
