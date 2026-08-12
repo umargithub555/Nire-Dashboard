@@ -146,7 +146,7 @@ export default function TrackingPage() {
           <div>
             <h1 className="text-xl lg:text-2xl font-semibold text-zinc-900">Tracking</h1>
             <p className="text-sm text-zinc-500 mt-0.5">
-              {policy ? `${policy.office_start_time.slice(0, 5)} - ${policy.office_end_time.slice(0, 5)} · every ${policy.sample_interval_minutes} min` : 'Loading policy'}
+              {policy ? `${policy.office_start_time.slice(0, 5)} - ${policy.office_end_time.slice(0, 5)} - every ${policy.sample_interval_minutes} min` : 'Loading policy'}
             </p>
           </div>
           <button
@@ -263,11 +263,12 @@ export default function TrackingPage() {
                       )}
                     </div>
                     <div className="text-xs text-zinc-400 mt-0.5">
-                      {[item.employee.designation, item.employee.branch?.name].filter(Boolean).join(' · ') || 'Employee'}
+                      {[item.employee.designation, item.employee.branch?.name].filter(Boolean).join(' - ') || 'Employee'}
                     </div>
                     <div className="text-xs text-zinc-500 mt-1">
                       {item.last_seen_at ? `Last seen ${format(new Date(item.last_seen_at), 'hh:mm a')}` : 'No location received'}
-                      {item.latest_sample?.accuracy_meters ? ` · ${Math.round(item.latest_sample.accuracy_meters)}m` : ''}
+                      {item.latest_sample ? ` - ${item.latest_sample.lat.toFixed(5)}, ${item.latest_sample.lng.toFixed(5)}` : ''}
+                      {item.latest_sample?.accuracy_meters ? ` - ${Math.round(item.latest_sample.accuracy_meters)}m` : ''}
                     </div>
                     {item.device && (!item.device.permission_background || !item.device.location_services_enabled || item.device.last_error) && (
                       <div className="text-xs text-amber-700 mt-1">
@@ -283,7 +284,7 @@ export default function TrackingPage() {
                       {item.attendance?.clock_in_at ? (
                         <>
                           In {format(new Date(item.attendance.clock_in_at), 'hh:mm a')}
-                          {item.attendance.clock_out_at ? ` · Out ${format(new Date(item.attendance.clock_out_at), 'hh:mm a')}` : ''}
+                          {item.attendance.clock_out_at ? ` - Out ${format(new Date(item.attendance.clock_out_at), 'hh:mm a')}` : ''}
                         </>
                       ) : (
                         'Not checked in'

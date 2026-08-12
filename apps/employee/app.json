@@ -1,0 +1,41 @@
+﻿{
+    "expo":  {
+                 "name":  "Nire Employee",
+                 "slug":  "nire-employee",
+                 "version":  "0.1.0",
+                 "orientation":  "portrait",
+                 "userInterfaceStyle":  "light",
+                 "scheme":  "nireemployee",
+                 "runtimeVersion":  {
+                                        "policy":  "appVersion"
+                                    },
+                 "android":  {
+                                 "package":  "com.nire.employee",
+                                 "versionCode":  1,
+                                 "permissions":  [
+                                                     "ACCESS_COARSE_LOCATION",
+                                                     "ACCESS_FINE_LOCATION",
+                                                     "ACCESS_BACKGROUND_LOCATION",
+                                                     "FOREGROUND_SERVICE",
+                                                     "FOREGROUND_SERVICE_LOCATION",
+                                                     "RECEIVE_BOOT_COMPLETED"
+                                                 ]
+                             },
+                 "plugins":  [
+                                 [
+                                     "expo-location",
+                                     {
+                                         "isAndroidBackgroundLocationEnabled":  true,
+                                         "isAndroidForegroundServiceEnabled":  true,
+                                         "locationAlwaysAndWhenInUsePermission":  "Nire Employee uses location during office hours for attendance and field visit verification.",
+                                         "locationWhenInUsePermission":  "Nire Employee uses your location for attendance and visits."
+                                     }
+                                 ]
+                             ],
+                 "extra":  {
+                               "apiBaseUrl":  "http://localhost:3000",
+                               "supabaseUrl":  "",
+                               "supabaseAnonKey":  ""
+                           }
+             }
+}

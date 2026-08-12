@@ -1,0 +1,33 @@
+{
+  "name": "nire-employee-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "build:apk": "eas build --platform android --profile preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "expo": "~57.0.0",
+    "expo-application": "~57.0.2",
+    "expo-battery": "~57.0.1",
+    "expo-constants": "~57.0.10",
+    "expo-device": "~57.0.1",
+    "expo-location": "~57.0.9",
+    "expo-network": "~57.0.1",
+    "expo-task-manager": "~57.0.9",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@types/react": "^19.2.0",
+    "babel-preset-expo": "^57.0.6",
+    "typescript": "^5.9.0"
+  }
+}

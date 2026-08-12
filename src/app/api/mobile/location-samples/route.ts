@@ -1,6 +1,29 @@
 import { getMobileEmployee } from '@/lib/mobile-auth'
 import { NextResponse } from 'next/server'
 
+export async function GET(req: Request) {
+  const ctx = await getMobileEmployee(req)
+  if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
+
+  const { searchParams } = new URL(req.url)
+  const latest = searchParams.get('latest') === '1'
+
+  let query = ctx.service
+    .from('location_samples')
+    .select('*')
+    .eq('employee_id', ctx.employee.id)
+    .order('recorded_at', { ascending: false })
+
+  if (latest) query = query.limit(1)
+  else query = query.limit(100)
+
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (latest) return NextResponse.json({ latest_sample: data?.[0] ?? null })
+  return NextResponse.json(data ?? [])
+}
+
 export async function POST(req: Request) {
   const ctx = await getMobileEmployee(req)
   if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
