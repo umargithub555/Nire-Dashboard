@@ -209,7 +209,7 @@ export default function TrackingPage() {
               <span className="text-xs font-medium text-zinc-500">Interval minutes</span>
               <input
                 type="number"
-                min={5}
+                min={1}
                 max={240}
                 value={form.sample_interval_minutes}
                 onChange={(e) => setForm((f) => ({ ...f, sample_interval_minutes: Number(e.target.value) }))}
