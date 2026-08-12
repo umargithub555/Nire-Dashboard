@@ -1,7 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+apps/employee/node_modules/
 /node_modules
+**/node_modules/
+**/node_modules/**
 /.pnp
 .pnp.*
 .yarn/*
@@ -37,6 +40,19 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+**/.env*
+
+
+# expo / react native
+**/.expo/
+**/.expo-shared/
+**/android/
+**/ios/
+**/dist/
+**/web-build/
+**/eas-build-*.tar.gz
+*.apk
+*.aab
 
 # vercel
 .vercel

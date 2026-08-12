@@ -49,6 +49,7 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
   const isApiRoute = path.startsWith('/api/')
+  const isMobileApiRoute = path.startsWith('/api/mobile/')
   const isPortalRoute = path.startsWith('/portal') || path.startsWith('/api/portal')
   const isPortalPublicRoute = portalPublicRoutes.includes(path)
   const isAdminPublicRoute = adminPublicRoutes.includes(path)
@@ -60,6 +61,10 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (!user) {
+    if (isMobileApiRoute) {
+      return supabaseResponse
+    }
+
     if (isPortalRoute && !isPortalPublicRoute) {
       return NextResponse.redirect(new URL('/portal/login', request.url))
     }
