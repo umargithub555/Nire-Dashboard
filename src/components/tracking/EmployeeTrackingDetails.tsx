@@ -96,7 +96,7 @@ export default function EmployeeTrackingDetails() {
           <h2 className="text-lg font-semibold text-zinc-900">Employee activity details</h2>
           <p className="mt-0.5 text-sm text-zinc-500">Attendance, visits, saved places, and location trail for a selected employee.</p>
         </div>
-        {selectedEmployee && <div className="text-sm font-medium text-zinc-600">{selectedEmployee.full_name}{selectedEmployee.branch?.name ? ` ? ${selectedEmployee.branch.name}` : ''}</div>}
+        {selectedEmployee && <div className="text-sm font-medium text-zinc-600">{selectedEmployee.full_name}{selectedEmployee.branch?.name ? ` - ${selectedEmployee.branch.name}` : ''}</div>}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-2 xl:grid-cols-4">
@@ -155,7 +155,7 @@ export default function EmployeeTrackingDetails() {
                     <MapPin size={15} className="mt-0.5 shrink-0 text-blue-600" />
                     <div className="min-w-0">
                       <div className="text-sm text-zinc-800">{sample.address || `${sample.lat.toFixed(5)}, ${sample.lng.toFixed(5)}`}</div>
-                      <div className="mt-0.5 text-xs text-zinc-400">{sample.source.replaceAll('_', ' ')} ? accuracy {sample.accuracy_meters ? `${Math.round(sample.accuracy_meters)} m` : 'unknown'}{sample.mocked ? ' ? mocked' : ''}</div>
+                      <div className="mt-0.5 text-xs text-zinc-400">{sample.source.replaceAll('_', ' ')} - accuracy {sample.accuracy_meters ? `${Math.round(sample.accuracy_meters)} m` : 'unknown'}{sample.mocked ? ' ? mocked' : ''}</div>
                     </div>
                   </div>
                 ))}
@@ -167,8 +167,8 @@ export default function EmployeeTrackingDetails() {
                 <div className="border-b border-zinc-100 px-4 py-4"><h3 className="font-semibold text-zinc-900">Attendance</h3></div>
                 {details.day.attendance ? (
                   <div className="space-y-3 px-4 py-4 text-sm">
-                    <DetailRow label="Check-in" value={`${format(new Date(details.day.attendance.clock_in_at), 'hh:mm a')} ? ${details.day.attendance.clock_in_address || 'Location name unavailable'}`} />
-                    <DetailRow label="Check-out" value={details.day.attendance.clock_out_at ? `${format(new Date(details.day.attendance.clock_out_at), 'hh:mm a')} ? ${details.day.attendance.clock_out_address || 'Location name unavailable'}` : 'Pending'} />
+                    <DetailRow label="Check-in" value={`${format(new Date(details.day.attendance.clock_in_at), 'hh:mm a')} - ${details.day.attendance.clock_in_address || 'Location name unavailable'}`} />
+                    <DetailRow label="Check-out" value={details.day.attendance.clock_out_at ? `${format(new Date(details.day.attendance.clock_out_at), 'hh:mm a')} - ${details.day.attendance.clock_out_address || 'Location name unavailable'}` : 'Pending'} />
                   </div>
                 ) : <div className="px-4 py-8 text-sm text-zinc-400">No attendance record for this day.</div>}
               </div>
@@ -177,7 +177,7 @@ export default function EmployeeTrackingDetails() {
                 <div className="border-b border-zinc-100 px-4 py-4"><h3 className="font-semibold text-zinc-900">Logged visits</h3></div>
                 {details.day.visits.length === 0 ? <div className="px-4 py-8 text-sm text-zinc-400">No visits logged for this day.</div> : (
                   <div className="divide-y divide-zinc-100">
-                    {details.day.visits.map((visit) => <div key={visit.id} className="px-4 py-3"><div className="text-sm font-medium text-zinc-800">{visit.purpose}</div><div className="mt-0.5 text-xs text-zinc-500">{format(new Date(visit.visited_at), 'hh:mm a')} ? {visit.place_name || visit.address || 'Location name unavailable'}</div></div>)}
+                    {details.day.visits.map((visit) => <div key={visit.id} className="px-4 py-3"><div className="text-sm font-medium text-zinc-800">{visit.purpose}</div><div className="mt-0.5 text-xs text-zinc-500">{format(new Date(visit.visited_at), 'hh:mm a')} - {visit.place_name || visit.address || 'Location name unavailable'}</div></div>)}
                   </div>
                 )}
               </div>

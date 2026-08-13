@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { getStalenessStatus, todayDateString } from '@/lib/tracking'
+import { getStalenessStatus, isWithinPolicyHoursAt, pakistanDayRange, todayDateString } from '@/lib/tracking'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   const service = createServiceClient()
   const today = todayDateString()
 
+  const dayRange = pakistanDayRange(today)
   const { data: policy, error: policyError } = await service
     .from('tracking_policies')
     .select('*')
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
     service
       .from('location_samples')
       .select('*')
-      .gte('recorded_at', `${today}T00:00:00.000Z`)
+      .gte('recorded_at', dayRange.start)
+      .lt('recorded_at', dayRange.end)
       .order('recorded_at', { ascending: false })
       .limit(2000),
     service
@@ -50,7 +52,16 @@ export async function GET(req: NextRequest) {
   if (devicesResult.error) return NextResponse.json({ error: devicesResult.error.message }, { status: 500 })
 
   const latestSamples = new Map<string, LocationSampleRow>()
+  const activePolicy = policy ?? {
+    office_start_time: '09:00',
+    office_end_time: '17:00',
+    timezone: 'Asia/Karachi',
+  }
+
   for (const sample of samplesResult.data ?? []) {
+    if (sample.source === 'scheduled' && !isWithinPolicyHoursAt(activePolicy, sample.recorded_at)) {
+      continue
+    }
     if (!latestSamples.has(sample.employee_id)) latestSamples.set(sample.employee_id, sample)
   }
 

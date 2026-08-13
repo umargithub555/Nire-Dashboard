@@ -1,4 +1,5 @@
 import { getMobileEmployee } from '@/lib/mobile-auth'
+import { isWithinPolicyHoursAt } from '@/lib/tracking'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
@@ -32,6 +33,16 @@ export async function POST(req: Request) {
   const samples: IncomingLocationSample[] = Array.isArray(body.samples) ? body.samples : [body]
   const uploadBatchId = crypto.randomUUID()
 
+  const { data: policy, error: policyError } = await ctx.service
+    .from('tracking_policies')
+    .select('office_start_time, office_end_time, timezone')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (policyError) return NextResponse.json({ error: policyError.message }, { status: 500 })
+
   const payload = samples
     .map((sample) => ({
       employee_id: ctx.employee.id,
@@ -59,9 +70,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'At least one valid location sample is required.' }, { status: 400 })
   }
 
-  const { data, error } = await ctx.service.from('location_samples').insert(payload).select()
+  const activePolicy = policy ?? {
+    office_start_time: '09:00',
+    office_end_time: '17:00',
+    timezone: 'Asia/Karachi',
+  }
+  const acceptedPayload = payload.filter((sample) => (
+    sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)
+  ))
+  const discardedOutsideOfficeHours = payload.length - acceptedPayload.length
+
+  if (acceptedPayload.length === 0) {
+    return NextResponse.json({
+      uploaded: 0,
+      discarded_outside_office_hours: discardedOutsideOfficeHours,
+      upload_batch_id: uploadBatchId,
+    })
+  }
+
+  const { data, error } = await ctx.service.from('location_samples').insert(acceptedPayload).select()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ uploaded: data?.length ?? 0, upload_batch_id: uploadBatchId })
+  return NextResponse.json({ uploaded: data?.length ?? 0, discarded_outside_office_hours: discardedOutsideOfficeHours, upload_batch_id: uploadBatchId })
 }
 
 function numberOrNull(value: unknown) {

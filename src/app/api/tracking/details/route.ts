@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { todayDateString } from '@/lib/tracking'
+import { isWithinPolicyHoursAt, pakistanDayRange, todayDateString } from '@/lib/tracking'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,22 @@ export async function GET(req: NextRequest) {
   }
 
   const service = createServiceClient()
-  const dayRange = karachiDayRange(date)
+  const { data: policy, error: policyError } = await service
+    .from('tracking_policies')
+    .select('office_start_time, office_end_time, timezone')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (policyError) return NextResponse.json({ error: policyError.message }, { status: 500 })
+
+  const activePolicy = policy ?? {
+    office_start_time: '09:00',
+    office_end_time: '17:00',
+    timezone: 'Asia/Karachi',
+  }
+  const dayRange = pakistanDayRange(date)
   const monthRange = karachiMonthRange(month)
 
   const [employeeResult, dayAttendanceResult, monthAttendanceResult, dayVisitsResult, monthVisitsResult, daySamplesResult, monthSamplesResult] = await Promise.all([
@@ -57,7 +72,7 @@ export async function GET(req: NextRequest) {
       .order('recorded_at', { ascending: true }),
     service
       .from('location_samples')
-      .select('id, address')
+      .select('id, address, recorded_at, source')
       .eq('employee_id', employeeId)
       .gte('recorded_at', monthRange.start)
       .lt('recorded_at', monthRange.end),
@@ -68,11 +83,14 @@ export async function GET(req: NextRequest) {
   if (failure?.error) return NextResponse.json({ error: failure.error.message }, { status: 500 })
   if (!employeeResult.data) return NextResponse.json({ error: 'Employee not found.' }, { status: 404 })
 
-  const daySamples = daySamplesResult.data ?? []
+  const includeSample = (sample: { source: string; recorded_at: string }) => (
+    sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)
+  )
+  const daySamples = (daySamplesResult.data ?? []).filter(includeSample)
   const dayVisits = dayVisitsResult.data ?? []
   const monthAttendance = monthAttendanceResult.data ?? []
   const monthVisits = monthVisitsResult.data ?? []
-  const monthSamples = monthSamplesResult.data ?? []
+  const monthSamples = (monthSamplesResult.data ?? []).filter(includeSample)
   const places = uniquePlaces([
     ...daySamples.map((sample) => ({ address: sample.address, recorded_at: sample.recorded_at, source: sample.source })),
     ...dayVisits.map((visit) => ({ address: visit.place_name || visit.address, recorded_at: visit.visited_at, source: 'visit' })),
@@ -109,12 +127,6 @@ export async function GET(req: NextRequest) {
   })
 }
 
-function karachiDayRange(date: string) {
-  const start = new Date(`${date}T00:00:00+05:00`)
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
-  return { start: start.toISOString(), end: end.toISOString() }
-}
 
 function karachiMonthRange(month: string) {
   const start = new Date(`${month}-01T00:00:00+05:00`)

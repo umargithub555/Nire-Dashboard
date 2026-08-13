@@ -70,3 +70,28 @@ export function getStalenessStatus(lastSeenAt: string | null, intervalMinutes: n
   if (ageMinutes <= intervalMinutes * 3) return 'stale'
   return 'offline'
 }
+
+export function isWithinPolicyHoursAt(policy: Pick<TrackingPolicy, 'office_start_time' | 'office_end_time' | 'timezone'>, value: string | Date) {
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone: policy.timezone || 'Asia/Karachi',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(value))
+  const [hour, minute] = time.split(':').map(Number)
+  const current = hour * 60 + minute
+  const [startHour, startMinute] = policy.office_start_time.slice(0, 5).split(':').map(Number)
+  const [endHour, endMinute] = policy.office_end_time.slice(0, 5).split(':').map(Number)
+  const start = startHour * 60 + startMinute
+  const end = endHour * 60 + endMinute
+
+  if (start <= end) return current >= start && current <= end
+  return current >= start || current <= end
+}
+
+export function pakistanDayRange(date: string) {
+  const start = new Date(`${date}T00:00:00+05:00`)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return { start: start.toISOString(), end: end.toISOString() }
+}
