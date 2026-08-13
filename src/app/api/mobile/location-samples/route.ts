@@ -1,4 +1,5 @@
 import { getMobileEmployee } from '@/lib/mobile-auth'
+import { reverseGeocodeOpenStreetMap } from '@/lib/reverse-geocode'
 import { isWithinPolicyHoursAt } from '@/lib/tracking'
 import { NextResponse } from 'next/server'
 
@@ -88,7 +89,33 @@ export async function POST(req: Request) {
     })
   }
 
-  const { data, error } = await ctx.service.from('location_samples').insert(acceptedPayload).select()
+  let payloadForInsert = acceptedPayload.map((sample) => (
+    sample.source === 'scheduled' ? { ...sample, address: null } : sample
+  ))
+  const newestScheduled = payloadForInsert
+    .filter((sample) => sample.source === 'scheduled')
+    .sort((left, right) => Date.parse(left.recorded_at) - Date.parse(right.recorded_at))
+    .pop()
+
+  if (newestScheduled) {
+    const { data: lastAddressedSample } = await ctx.service
+      .from('location_samples')
+      .select('recorded_at')
+      .eq('employee_id', ctx.employee.id)
+      .eq('source', 'scheduled')
+      .not('address', 'is', null)
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const lastAddressedAt = lastAddressedSample ? Date.parse(lastAddressedSample.recorded_at) : Number.NEGATIVE_INFINITY
+    if (Date.parse(newestScheduled.recorded_at) - lastAddressedAt >= 30 * 60 * 1000) {
+      const address = await reverseGeocodeOpenStreetMap(newestScheduled.lat, newestScheduled.lng)
+      if (address) payloadForInsert = payloadForInsert.map((sample) => sample === newestScheduled ? { ...sample, address } : sample)
+    }
+  }
+
+  const { data, error } = await ctx.service.from('location_samples').insert(payloadForInsert).select()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ uploaded: data?.length ?? 0, discarded_outside_office_hours: discardedOutsideOfficeHours, upload_batch_id: uploadBatchId })
 }

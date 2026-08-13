@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Clock, MapPin, RefreshCw, Settings, ShieldCheck, WifiOff } from 'lucide-react'
 import toast from 'react-hot-toast'
-import EmployeeTrackingDetails from '@/components/tracking/EmployeeTrackingDetails'
 
 const MapModal = dynamic(() => import('@/components/ui/MapModal'), { ssr: false })
 
@@ -317,7 +316,6 @@ export default function TrackingPage() {
       </div>
 
 
-        <EmployeeTrackingDetails />
       <MapModal
         isOpen={!!selectedLocation}
         onClose={() => setSelectedLocation(null)}
