@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Application from 'expo-application'
 import * as Battery from 'expo-battery'
 import * as Device from 'expo-device'
@@ -12,6 +13,10 @@ import { LocationPayload, TrackingPolicy } from '../types'
 
 export const LOCATION_TASK_NAME = 'nire-office-hours-location'
 export const LOCATION_HEALTH_TASK_NAME = 'nire-location-health-check'
+
+const SCHEDULED_ADDRESS_INTERVAL_MS = 30 * 60 * 1000
+const LAST_SCHEDULED_ADDRESS_AT_KEY = 'nire.lastScheduledAddressAt'
+const TRACKING_POLICY_KEY = 'nire.trackingPolicy'
 
 export async function requestLocationPermissions() {
   const foreground = await Location.requestForegroundPermissionsAsync()
@@ -110,7 +115,37 @@ export async function uploadLocationSamples(samples: LocationPayload[]) {
   await uploadDeviceStatus({ last_error: null })
 }
 
+export async function addScheduledAddressIfDue(samples: LocationPayload[]) {
+  if (samples.length === 0) return samples
+
+  const savedPolicy = await getSavedTrackingPolicy()
+  if (savedPolicy && !isWithinOfficeHours(savedPolicy)) return samples
+
+  const lastLookupAt = Number(await AsyncStorage.getItem(LAST_SCHEDULED_ADDRESS_AT_KEY))
+  if (Number.isFinite(lastLookupAt) && Date.now() - lastLookupAt < SCHEDULED_ADDRESS_INTERVAL_MS) {
+    return samples
+  }
+
+  const sampleIndex = samples.length - 1
+  const sample = samples[sampleIndex]
+  try {
+    const result = await apiFetch<{ address: string | null }>(
+      `/api/mobile/location-name?lat=${encodeURIComponent(sample.lat)}&lng=${encodeURIComponent(sample.lng)}`
+    )
+    if (!result.address) return samples
+
+    const enrichedSamples = [...samples]
+    enrichedSamples[sampleIndex] = { ...sample, address: result.address }
+    await AsyncStorage.setItem(LAST_SCHEDULED_ADDRESS_AT_KEY, String(Date.now()))
+    return enrichedSamples
+  } catch {
+    // Keep live coordinate uploads running when the address provider is unavailable.
+    return samples
+  }
+}
+
 export async function startOfficeTracking(policy: TrackingPolicy) {
+  await AsyncStorage.setItem(TRACKING_POLICY_KEY, JSON.stringify(policy))
   const permissions = await getLocationReadiness()
   await uploadDeviceStatus({ last_error: null })
   if (!permissions.foreground || !permissions.background || !permissions.servicesEnabled) {
@@ -154,8 +189,21 @@ async function registerLocationHealthCheck() {
   if (registered) return
 
   await BackgroundTask.registerTaskAsync(LOCATION_HEALTH_TASK_NAME, {
+
     minimumInterval: 15,
   })
+}
+
+async function getSavedTrackingPolicy() {
+  const rawPolicy = await AsyncStorage.getItem(TRACKING_POLICY_KEY)
+  if (!rawPolicy) return null
+
+  try {
+    const policy = JSON.parse(rawPolicy) as TrackingPolicy
+    return policy.office_start_time && policy.office_end_time ? policy : null
+  } catch {
+    return null
+  }
 }
 
 export function isWithinOfficeHours(policy: TrackingPolicy, now = new Date()) {
