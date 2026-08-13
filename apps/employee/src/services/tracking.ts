@@ -3,12 +3,15 @@ import * as Battery from 'expo-battery'
 import * as Device from 'expo-device'
 import * as Location from 'expo-location'
 import * as Network from 'expo-network'
+import * as BackgroundTask from 'expo-background-task'
+import * as TaskManager from 'expo-task-manager'
 import { AppState, Platform } from 'react-native'
 import { apiFetch } from '../lib/api'
 import { getInstallationId } from '../lib/install'
 import { LocationPayload, TrackingPolicy } from '../types'
 
 export const LOCATION_TASK_NAME = 'nire-office-hours-location'
+export const LOCATION_HEALTH_TASK_NAME = 'nire-location-health-check'
 
 export async function requestLocationPermissions() {
   const foreground = await Location.requestForegroundPermissionsAsync()
@@ -23,7 +26,22 @@ export async function requestLocationPermissions() {
     permission_foreground: foreground.status === 'granted',
     permission_background: background.status === 'granted',
     location_services_enabled: servicesEnabled,
+    last_error: null,
   })
+
+  return {
+    foreground: foreground.status === 'granted',
+    background: background.status === 'granted',
+    servicesEnabled,
+  }
+}
+
+export async function getLocationReadiness() {
+  const [foreground, background, servicesEnabled] = await Promise.all([
+    Location.getForegroundPermissionsAsync(),
+    Location.getBackgroundPermissionsAsync(),
+    Location.hasServicesEnabledAsync(),
+  ])
 
   return {
     foreground: foreground.status === 'granted',
@@ -34,6 +52,7 @@ export async function requestLocationPermissions() {
 
 export async function uploadDeviceStatus(extra: Record<string, unknown> = {}) {
   const installationId = await getInstallationId()
+  const readiness = await getLocationReadiness()
 
   await apiFetch('/api/mobile/device-status', {
     method: 'POST',
@@ -43,6 +62,9 @@ export async function uploadDeviceStatus(extra: Record<string, unknown> = {}) {
       app_version: Application.nativeApplicationVersion,
       device_name: Device.deviceName,
       os_version: Device.osVersion,
+      permission_foreground: readiness.foreground,
+      permission_background: readiness.background,
+      location_services_enabled: readiness.servicesEnabled,
       ...extra,
     }),
   })
@@ -50,11 +72,18 @@ export async function uploadDeviceStatus(extra: Record<string, unknown> = {}) {
 
 export async function captureCurrentLocation(source: LocationPayload['source'] = 'manual') {
   const installationId = await getInstallationId()
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  })
+  try {
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    })
 
-  return normalizeLocation(location, source, installationId)
+    return normalizeLocation(location, source, installationId)
+  } catch (error) {
+    void uploadDeviceStatus({
+      last_error: error instanceof Error ? error.message : 'Location capture failed',
+    }).catch(() => undefined)
+    throw error
+  }
 }
 
 export async function uploadLocationSamples(samples: LocationPayload[]) {
@@ -76,10 +105,14 @@ export async function uploadLocationSamples(samples: LocationPayload[]) {
       })),
     }),
   })
+
+  // A successful location sample proves the service is available and clears prior errors.
+  await uploadDeviceStatus({ last_error: null })
 }
 
 export async function startOfficeTracking(policy: TrackingPolicy) {
-  const permissions = await requestLocationPermissions()
+  const permissions = await getLocationReadiness()
+  await uploadDeviceStatus({ last_error: null })
   if (!permissions.foreground || !permissions.background || !permissions.servicesEnabled) {
     return { started: false, reason: 'Location permissions or services are missing.' }
   }
@@ -87,7 +120,8 @@ export async function startOfficeTracking(policy: TrackingPolicy) {
   const intervalMs = policy.sample_interval_minutes * 60 * 1000
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
   if (alreadyStarted) {
-    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME)
+    await registerLocationHealthCheck()
+    return { started: true }
   }
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
@@ -103,12 +137,25 @@ export async function startOfficeTracking(policy: TrackingPolicy) {
     },
   })
 
+  await registerLocationHealthCheck()
   return { started: true }
 }
 
 export async function stopOfficeTracking() {
   const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
   if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME)
+
+  const healthTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
+  if (healthTaskRegistered) await BackgroundTask.unregisterTaskAsync(LOCATION_HEALTH_TASK_NAME)
+}
+
+async function registerLocationHealthCheck() {
+  const registered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
+  if (registered) return
+
+  await BackgroundTask.registerTaskAsync(LOCATION_HEALTH_TASK_NAME, {
+    minimumInterval: 15,
+  })
 }
 
 export function isWithinOfficeHours(policy: TrackingPolicy, now = new Date()) {

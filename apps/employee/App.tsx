@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -162,12 +163,16 @@ function EmployeeApp() {
   }
 
   async function syncTracking(policy: TrackingPolicy) {
-    if (isWithinOfficeHours(policy)) {
-      const result = await startOfficeTracking(policy)
-      setTrackingMessage(result.started ? 'Tracking active during office hours' : result.reason ?? 'Tracking not active')
-    } else {
-      await stopOfficeTracking()
-      setTrackingMessage('Tracking paused outside office hours')
+    try {
+      if (isWithinOfficeHours(policy)) {
+        const result = await startOfficeTracking(policy)
+        setTrackingMessage(result.started ? 'Tracking active during office hours' : result.reason ?? 'Tracking not active')
+      } else {
+        await stopOfficeTracking()
+        setTrackingMessage('Tracking paused outside office hours')
+      }
+    } catch {
+      setTrackingMessage('Tracking status will retry when the network is available')
     }
   }
 
@@ -179,6 +184,16 @@ function EmployeeApp() {
     if (!data?.policy) return
     const id = setInterval(() => syncTracking(data.policy), 60000)
     return () => clearInterval(id)
+  }, [data?.policy])
+
+  useEffect(() => {
+    if (!data?.policy) return
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void syncTracking(data.policy)
+    })
+
+    return () => subscription.remove()
   }, [data?.policy])
 
   const todayRecord = useMemo(() => {
