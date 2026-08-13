@@ -11,7 +11,8 @@ export async function GET(req: Request) {
     .select('*')
     .eq('employee_id', ctx.employee.id)
     .order('date', { ascending: false })
-    .limit(60)
+    .gte('date', dateDaysAgo(9))
+    .limit(10)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
@@ -127,3 +128,9 @@ type AttendanceLocationBody = {
 }
 
 type MobileEmployeeOk = Exclude<Awaited<ReturnType<typeof getMobileEmployee>>, { error: string }>
+
+function dateDaysAgo(days: number) {
+  const date = new Date(`${todayDateString()}T00:00:00.000Z`)
+  date.setUTCDate(date.getUTCDate() - days)
+  return date.toISOString().slice(0, 10)
+}

@@ -480,9 +480,28 @@ function VisitsView({ visits, onChanged }: { visits: Visit[]; onChanged: () => v
     <View style={styles.stack}>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Log Visit</Text>
-        <TextInput value={purpose} onChangeText={setPurpose} placeholder="Purpose" style={styles.input} />
-        <TextInput value={place} onChangeText={setPlace} placeholder="Place name" style={styles.input} />
-        <TextInput value={notes} onChangeText={setNotes} placeholder="Notes" style={[styles.input, styles.textArea]} multiline />
+        <TextInput
+          value={purpose}
+          onChangeText={setPurpose}
+          placeholder="Purpose, e.g. client meeting"
+          placeholderTextColor="#71717a"
+          style={styles.input}
+        />
+        <TextInput
+          value={place}
+          onChangeText={setPlace}
+          placeholder="Place name (optional)"
+          placeholderTextColor="#71717a"
+          style={styles.input}
+        />
+        <TextInput
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Notes (optional)"
+          placeholderTextColor="#71717a"
+          style={[styles.input, styles.textArea]}
+          multiline
+        />
         <TouchableOpacity disabled={busy} onPress={submit} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>{busy ? 'Logging...' : 'Log visit'}</Text>
         </TouchableOpacity>
@@ -493,7 +512,7 @@ function VisitsView({ visits, onChanged }: { visits: Visit[]; onChanged: () => v
           <Text style={styles.listTitle}>{visit.purpose}</Text>
           {!!visit.place_name && <Text style={styles.muted}>{visit.place_name}</Text>}
           {!!visit.address && <Text style={styles.muted}>{visit.address}</Text>}
-          <Text style={styles.muted}>{formatTime(visit.visited_at)}</Text>
+          <Text style={styles.muted}>{formatDate(visit.visited_at)} - {formatTime(visit.visited_at)}</Text>
         </View>
       ))}
     </View>
@@ -507,6 +526,14 @@ function Stat({ label, value }: { label: string; value: string }) {
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   )
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-PK', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function formatTime(value: string) {

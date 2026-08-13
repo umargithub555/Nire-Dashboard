@@ -10,6 +10,7 @@ export async function GET(req: Request) {
     .select('*')
     .eq('employee_id', ctx.employee.id)
     .order('visited_at', { ascending: false })
+    .gte('visited_at', new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString())
     .limit(100)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
