@@ -108,6 +108,7 @@ async function insertAttendanceLocationSample(
     recorded_at: body.recorded_at || new Date().toISOString(),
     lat: body.lat,
     lng: body.lng,
+    address: body.address || null,
     accuracy_meters: typeof body.accuracy === 'number' ? body.accuracy : null,
     mocked: typeof body.mocked === 'boolean' ? body.mocked : null,
     source,

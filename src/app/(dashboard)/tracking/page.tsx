@@ -31,6 +31,7 @@ type LiveEmployee = {
   latest_sample: {
     lat: number
     lng: number
+    address: string | null
     accuracy_meters: number | null
     recorded_at: string
     mocked: boolean | null
@@ -267,6 +268,7 @@ export default function TrackingPage() {
                     </div>
                     <div className="text-xs text-zinc-500 mt-1">
                       {item.last_seen_at ? `Last seen ${format(new Date(item.last_seen_at), 'hh:mm a')}` : 'No location received'}
+                      {item.latest_sample?.address ? ` - ${item.latest_sample.address}` : ''}
                       {item.latest_sample ? ` - ${item.latest_sample.lat.toFixed(5)}, ${item.latest_sample.lng.toFixed(5)}` : ''}
                       {item.latest_sample?.accuracy_meters ? ` - ${Math.round(item.latest_sample.accuracy_meters)}m` : ''}
                     </div>
@@ -295,7 +297,7 @@ export default function TrackingPage() {
                       onClick={() => item.latest_sample && setSelectedLocation({
                         lat: item.latest_sample.lat,
                         lng: item.latest_sample.lng,
-                        address: `${item.latest_sample.lat.toFixed(5)}, ${item.latest_sample.lng.toFixed(5)}`,
+                        address: item.latest_sample.address || `${item.latest_sample.lat.toFixed(5)}, ${item.latest_sample.lng.toFixed(5)}`,
                         employeeName: item.employee.full_name,
                         branchName: item.employee.branch?.name || 'Latest location',
                       })}

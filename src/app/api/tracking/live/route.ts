@@ -96,6 +96,7 @@ type AttendanceRow = {
 type LocationSampleRow = {
   employee_id: string
   recorded_at: string
+  address: string | null
   lat: number
   lng: number
   accuracy_meters: number | null

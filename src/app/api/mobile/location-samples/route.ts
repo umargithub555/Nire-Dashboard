@@ -38,6 +38,7 @@ export async function POST(req: Request) {
       attendance_id: sample.attendance_id || null,
       recorded_at: sample.recorded_at || new Date().toISOString(),
       lat: Number(sample.lat),
+      address: typeof sample.address === 'string' ? sample.address : null,
       lng: Number(sample.lng),
       accuracy_meters: numberOrNull(sample.accuracy_meters ?? sample.accuracy),
       altitude: numberOrNull(sample.altitude),
@@ -84,5 +85,6 @@ type IncomingLocationSample = {
   is_charging?: boolean
   network_type?: string
   app_state?: string
+  address?: string
   installation_id?: string
 }

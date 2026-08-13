@@ -34,6 +34,10 @@ type LatestLocationResponse = {
   latest_sample: LocationPayload | null
 }
 
+type LocationNameResponse = {
+  address: string | null
+}
+
 const fallbackPolicy: TrackingPolicy = {
   id: 'fallback',
   office_start_time: '09:00',
@@ -196,6 +200,15 @@ function EmployeeApp() {
     await supabase.auth.signOut({ scope: 'local' })
   }
 
+  async function captureLocationWithName(source: LocationPayload['source']) {
+    const location = await captureCurrentLocation(source)
+    const name = await apiFetch<LocationNameResponse>(
+      `/api/mobile/location-name?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
+    ).catch(() => ({ address: null }))
+
+    return { ...location, address: name.address }
+  }
+
   if (loading && !data) {
     return (
       <SafeAreaView style={styles.center}>
@@ -242,7 +255,7 @@ function EmployeeApp() {
             onRefreshLocation={async () => {
               setRefreshingLocation(true)
               try {
-                const location = await captureCurrentLocation('manual')
+                const location = await captureLocationWithName('manual')
                 setLatestLocation(location)
                 await uploadLocationSamples([location])
               } catch (error) {
@@ -314,6 +327,7 @@ function TodayView({
         <Text style={styles.bigText}>
           {latestLocation ? `${latestLocation.lat.toFixed(5)}, ${latestLocation.lng.toFixed(5)}` : 'Not captured yet'}
         </Text>
+        {!!latestLocation?.address && <Text style={styles.muted}>{latestLocation.address}</Text>}
         <Text style={styles.muted}>
           {latestLocation
             ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)}m` : 'unknown'} - ${formatTime(latestLocation.recorded_at ?? new Date().toISOString())}`
@@ -361,11 +375,13 @@ function AttendanceView({
     setBusy(action)
     try {
       const location = await captureCurrentLocation(action === 'in' ? 'attendance_checkin' : 'attendance_checkout')
-      const address = `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`
+      const addressResult = await apiFetch<LocationNameResponse>(
+        `/api/mobile/location-name?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
+      ).catch(() => ({ address: null }))
       const endpoint = '/api/mobile/attendance'
       await apiFetch(endpoint, {
         method: action === 'in' ? 'POST' : 'PATCH',
-        body: JSON.stringify({ ...location, address }),
+        body: JSON.stringify({ ...location, address: addressResult.address ?? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}` }),
       })
       await onChanged()
     } catch (error) {
@@ -421,12 +437,14 @@ function VisitsView({ visits, onChanged }: { visits: Visit[]; onChanged: () => v
     setBusy(true)
     try {
       const location = await captureCurrentLocation('visit')
-      const address = `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`
+      const addressResult = await apiFetch<LocationNameResponse>(
+        `/api/mobile/location-name?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
+      ).catch(() => ({ address: null }))
       await apiFetch('/api/mobile/visits', {
         method: 'POST',
         body: JSON.stringify({
           ...location,
-          address,
+          address: addressResult.address ?? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
           purpose: purpose.trim(),
           place_name: place.trim() || null,
           notes: notes.trim() || null,
@@ -459,6 +477,7 @@ function VisitsView({ visits, onChanged }: { visits: Visit[]; onChanged: () => v
         <View key={visit.id} style={styles.listItem}>
           <Text style={styles.listTitle}>{visit.purpose}</Text>
           {!!visit.place_name && <Text style={styles.muted}>{visit.place_name}</Text>}
+          {!!visit.address && <Text style={styles.muted}>{visit.address}</Text>}
           <Text style={styles.muted}>{formatTime(visit.visited_at)}</Text>
         </View>
       ))}

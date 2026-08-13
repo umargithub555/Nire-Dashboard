@@ -40,6 +40,7 @@ export type Visit = {
 export type LocationPayload = {
   lat: number
   lng: number
+  address?: string | null
   accuracy?: number | null
   mocked?: boolean | null
   recorded_at?: string
