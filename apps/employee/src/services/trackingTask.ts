@@ -1,7 +1,7 @@
 import * as BackgroundTask from 'expo-background-task'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
-import { LOCATION_HEALTH_TASK_NAME, LOCATION_TASK_NAME, normalizeLocation, uploadDeviceStatus, uploadLocationSamples } from './tracking'
+import { dueScheduledSamples, LOCATION_HEALTH_TASK_NAME, LOCATION_TASK_NAME, markScheduledSamplesUploaded, normalizeLocation, uploadDeviceStatus, uploadLocationSamples } from './tracking'
 import { getInstallationId } from '../lib/install'
 
 type LocationTaskData = {
@@ -21,7 +21,11 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     const installationId = await getInstallationId()
     const samples = locations.map((location) => normalizeLocation(location, 'scheduled', installationId))
-    await uploadLocationSamples(samples)
+    const dueSamples = await dueScheduledSamples(samples)
+    if (dueSamples.length === 0) return
+
+    await uploadLocationSamples(dueSamples)
+    await markScheduledSamplesUploaded(dueSamples)
   } catch (taskError) {
     await uploadDeviceStatus({
       last_error: taskError instanceof Error ? taskError.message : 'Background tracking upload failed',

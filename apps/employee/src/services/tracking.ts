@@ -17,6 +17,7 @@ export const LOCATION_HEALTH_TASK_NAME = 'nire-location-health-check'
 const SCHEDULED_ADDRESS_INTERVAL_MS = 30 * 60 * 1000
 const LAST_SCHEDULED_ADDRESS_AT_KEY = 'nire.lastScheduledAddressAt'
 const TRACKING_POLICY_KEY = 'nire.trackingPolicy'
+const LAST_SCHEDULED_UPLOAD_AT_KEY = 'nire.lastScheduledUploadAt'
 
 export async function requestLocationPermissions() {
   const foreground = await Location.requestForegroundPermissionsAsync()
@@ -113,6 +114,36 @@ export async function uploadLocationSamples(samples: LocationPayload[]) {
 
   // A successful location sample proves the service is available and clears prior errors.
   await uploadDeviceStatus({ last_error: null })
+}
+
+export async function dueScheduledSamples(samples: LocationPayload[]) {
+  if (samples.length === 0) return samples
+
+  const policy = await getSavedTrackingPolicy()
+  const intervalMs = Math.max(policy?.sample_interval_minutes ?? 30, 1) * 60 * 1000
+  const storedTimestamp = Number(await AsyncStorage.getItem(LAST_SCHEDULED_UPLOAD_AT_KEY))
+  let lastUploadedAt = Number.isFinite(storedTimestamp) ? storedTimestamp : Number.NEGATIVE_INFINITY
+  const dueSamples: LocationPayload[] = []
+
+  for (const sample of [...samples].sort((left, right) => Date.parse(left.recorded_at ?? '') - Date.parse(right.recorded_at ?? ''))) {
+    const recordedAt = Date.parse(sample.recorded_at ?? '')
+    if (!Number.isFinite(recordedAt) || recordedAt - lastUploadedAt < intervalMs) continue
+    dueSamples.push(sample)
+    lastUploadedAt = recordedAt
+  }
+
+  return dueSamples
+}
+
+export async function markScheduledSamplesUploaded(samples: LocationPayload[]) {
+  const latestTimestamp = samples.reduce((latest, sample) => {
+    const timestamp = Date.parse(sample.recorded_at ?? '')
+    return Number.isFinite(timestamp) && timestamp > latest ? timestamp : latest
+  }, Number.NEGATIVE_INFINITY)
+
+  if (Number.isFinite(latestTimestamp)) {
+    await AsyncStorage.setItem(LAST_SCHEDULED_UPLOAD_AT_KEY, String(latestTimestamp))
+  }
 }
 
 export async function addScheduledAddressIfDue(samples: LocationPayload[]) {

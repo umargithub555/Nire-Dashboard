@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
   const { data: policy, error: policyError } = await ctx.service
     .from('tracking_policies')
-    .select('office_start_time, office_end_time, timezone')
+    .select('office_start_time, office_end_time, timezone, sample_interval_minutes')
     .eq('is_active', true)
     .order('updated_at', { ascending: false })
     .limit(1)
@@ -75,21 +75,54 @@ export async function POST(req: Request) {
     office_start_time: '09:00',
     office_end_time: '17:00',
     timezone: 'Asia/Karachi',
+    sample_interval_minutes: 30,
   }
   const acceptedPayload = payload.filter((sample) => (
     sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)
   ))
   const discardedOutsideOfficeHours = payload.length - acceptedPayload.length
+  const scheduledIntervalMs = Math.max(activePolicy.sample_interval_minutes, 1) * 60 * 1000
+  const scheduledCandidates = acceptedPayload
+    .filter((sample) => sample.source === 'scheduled')
+    .sort((left, right) => Date.parse(left.recorded_at) - Date.parse(right.recorded_at))
+  const allowedScheduledSamples = new Set<typeof acceptedPayload[number]>()
 
-  if (acceptedPayload.length === 0) {
+  if (scheduledCandidates.length > 0) {
+    const { data: lastScheduledSample, error: lastScheduledError } = await ctx.service
+      .from('location_samples')
+      .select('recorded_at')
+      .eq('employee_id', ctx.employee.id)
+      .eq('source', 'scheduled')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (lastScheduledError) return NextResponse.json({ error: lastScheduledError.message }, { status: 500 })
+
+    let lastScheduledAt = lastScheduledSample ? Date.parse(lastScheduledSample.recorded_at) : Number.NEGATIVE_INFINITY
+    for (const sample of scheduledCandidates) {
+      const recordedAt = Date.parse(sample.recorded_at)
+      if (recordedAt - lastScheduledAt < scheduledIntervalMs) continue
+      allowedScheduledSamples.add(sample)
+      lastScheduledAt = recordedAt
+    }
+  }
+
+  const throttledPayload = acceptedPayload.filter((sample) => (
+    sample.source !== 'scheduled' || allowedScheduledSamples.has(sample)
+  ))
+  const discardedTooFrequent = acceptedPayload.length - throttledPayload.length
+
+  if (throttledPayload.length === 0) {
     return NextResponse.json({
       uploaded: 0,
       discarded_outside_office_hours: discardedOutsideOfficeHours,
       upload_batch_id: uploadBatchId,
+      discarded_too_frequent: discardedTooFrequent,
     })
   }
 
-  let payloadForInsert = acceptedPayload.map((sample) => (
+  let payloadForInsert = throttledPayload.map((sample) => (
     sample.source === 'scheduled' ? { ...sample, address: null } : sample
   ))
   const newestScheduled = payloadForInsert
@@ -117,7 +150,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await ctx.service.from('location_samples').insert(payloadForInsert).select()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ uploaded: data?.length ?? 0, discarded_outside_office_hours: discardedOutsideOfficeHours, upload_batch_id: uploadBatchId })
+  return NextResponse.json({ uploaded: data?.length ?? 0, discarded_outside_office_hours: discardedOutsideOfficeHours, discarded_too_frequent: discardedTooFrequent, upload_batch_id: uploadBatchId })
 }
 
 function numberOrNull(value: unknown) {
