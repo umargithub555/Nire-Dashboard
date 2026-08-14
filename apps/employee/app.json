@@ -31,7 +31,8 @@
           "locationWhenInUsePermission": "Nire Employee uses your location for attendance and visits."
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "expo-router"
     ],
     "extra": {
       "apiBaseUrl": "http://localhost:3000",
