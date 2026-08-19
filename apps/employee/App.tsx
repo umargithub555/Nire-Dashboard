@@ -17,11 +17,18 @@ import { supabase } from './src/lib/supabase'
 import {
   captureCurrentLocation,
   isWithinOfficeHours,
+  registerLocationHealthCheck,
   requestLocationPermissions,
   startOfficeTracking,
   stopOfficeTracking,
   uploadLocationSamples,
 } from './src/services/tracking'
+import {
+  cancelTrackingAlarms,
+  canScheduleExactAlarms,
+  openAlarmPermissionSettings,
+  scheduleTrackingAlarms,
+} from './src/services/alarmScheduler'
 import { Attendance, Employee, LocationPayload, TrackingPolicy, Visit } from './src/types'
 
 type AppData = {
@@ -134,6 +141,7 @@ function EmployeeApp() {
   const [visits, setVisits] = useState<Visit[]>([])
   const [loading, setLoading] = useState(true)
   const [trackingMessage, setTrackingMessage] = useState('')
+  const [needsAlarmPermission, setNeedsAlarmPermission] = useState(false)
   const [latestLocation, setLatestLocation] = useState<LocationPayload | null>(null)
   const [refreshingLocation, setRefreshingLocation] = useState(false)
 
@@ -155,6 +163,7 @@ function EmployeeApp() {
       setVisits(Array.isArray(visitRows) ? visitRows : [])
       setLatestLocation(latest.latest_sample)
       await syncTracking(appData.policy)
+      await checkAlarmPermission()
     } catch (error) {
       Alert.alert('Could not load app', error instanceof Error ? error.message : 'Please try again.')
     } finally {
@@ -164,6 +173,11 @@ function EmployeeApp() {
 
   async function syncTracking(policy: TrackingPolicy) {
     try {
+      // Always keep the background health task registered (15-min fallback)
+      await registerLocationHealthCheck()
+      // Schedule exact alarms for precise start/stop (cancels + re-sets each call)
+      await scheduleTrackingAlarms(policy).catch(() => undefined)
+
       if (isWithinOfficeHours(policy)) {
         const result = await startOfficeTracking(policy)
         setTrackingMessage(result.started ? 'Tracking active during office hours' : result.reason ?? 'Tracking not active')
@@ -174,6 +188,11 @@ function EmployeeApp() {
     } catch {
       setTrackingMessage('Tracking status will retry when the network is available')
     }
+  }
+
+  async function checkAlarmPermission() {
+    const ok = await canScheduleExactAlarms()
+    setNeedsAlarmPermission(!ok)
   }
 
   useEffect(() => {
@@ -211,7 +230,8 @@ function EmployeeApp() {
     setAttendance([])
     setVisits([])
     setLatestLocation(null)
-    void stopOfficeTracking().catch(() => undefined)
+    void stopOfficeTracking(true).catch(() => undefined)
+    void cancelTrackingAlarms().catch(() => undefined)
     await supabase.auth.signOut({ scope: 'local' })
   }
 
@@ -264,9 +284,14 @@ function EmployeeApp() {
             visits={visits}
             todayRecord={todayRecord}
             trackingMessage={trackingMessage}
+            needsAlarmPermission={needsAlarmPermission}
             latestLocation={latestLocation}
             refreshingLocation={refreshingLocation}
             onRefresh={load}
+            onOpenAlarmSettings={async () => {
+              await openAlarmPermissionSettings()
+              await checkAlarmPermission()
+            }}
             onRefreshLocation={async () => {
               setRefreshingLocation(true)
               try {
@@ -304,9 +329,11 @@ function TodayView({
   visits,
   todayRecord,
   trackingMessage,
+  needsAlarmPermission,
   latestLocation,
   refreshingLocation,
   onRefresh,
+  onOpenAlarmSettings,
   onRefreshLocation,
   onRequestPermissions,
 }: {
@@ -315,14 +342,27 @@ function TodayView({
   visits: Visit[]
   todayRecord: Attendance | null
   trackingMessage: string
+  needsAlarmPermission: boolean
   latestLocation: LocationPayload | null
   refreshingLocation: boolean
   onRefresh: () => void
+  onOpenAlarmSettings: () => void
   onRefreshLocation: () => void
   onRequestPermissions: () => void
 }) {
   return (
     <View style={styles.stack}>
+      {needsAlarmPermission && (
+        <View style={styles.alarmBanner}>
+          <Text style={styles.alarmBannerTitle}>?? Auto-Start Permission Required</Text>
+          <Text style={styles.alarmBannerBody}>
+            Allow 'Alarms {'&'} Reminders' so tracking starts automatically at your scheduled time without opening the app.
+          </Text>
+          <TouchableOpacity onPress={onOpenAlarmSettings} style={styles.alarmBannerButton}>
+            <Text style={styles.alarmBannerButtonText}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Office Hours</Text>
         <Text style={styles.bigText}>
@@ -769,5 +809,36 @@ const styles = StyleSheet.create({
     color: '#18181b',
     fontWeight: '800',
     marginBottom: 4,
+  },
+  alarmBanner: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    padding: 16,
+    gap: 8,
+  },
+  alarmBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  alarmBannerBody: {
+    fontSize: 13,
+    color: '#78350f',
+    lineHeight: 18,
+  },
+  alarmBannerButton: {
+    minHeight: 40,
+    borderRadius: 8,
+    backgroundColor: '#f59e0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  alarmBannerButtonText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
   },
 })

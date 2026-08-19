@@ -1,7 +1,7 @@
 import * as BackgroundTask from 'expo-background-task'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
-import { dueScheduledSamples, LOCATION_HEALTH_TASK_NAME, LOCATION_TASK_NAME, markScheduledSamplesUploaded, normalizeLocation, uploadDeviceStatus, uploadLocationSamples } from './tracking'
+import { dueScheduledSamples, getSavedTrackingPolicy, isWithinOfficeHours, LOCATION_HEALTH_TASK_NAME, LOCATION_TASK_NAME, markScheduledSamplesUploaded, normalizeLocation, startOfficeTracking, stopOfficeTracking, uploadDeviceStatus, uploadLocationSamples } from './tracking'
 import { getInstallationId } from '../lib/install'
 
 type LocationTaskData = {
@@ -12,6 +12,12 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   try {
     if (error) {
       await uploadDeviceStatus({ last_error: error.message }).catch(() => undefined)
+      return
+    }
+
+    const policy = await getSavedTrackingPolicy()
+    if (policy && !isWithinOfficeHours(policy)) {
+      await stopOfficeTracking(false)
       return
     }
 
@@ -35,6 +41,16 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 TaskManager.defineTask(LOCATION_HEALTH_TASK_NAME, async () => {
   try {
     await uploadDeviceStatus({ last_error: null })
+
+    const policy = await getSavedTrackingPolicy()
+    if (policy) {
+      if (isWithinOfficeHours(policy)) {
+        await startOfficeTracking(policy)
+      } else {
+        await stopOfficeTracking(false)
+      }
+    }
+
     return BackgroundTask.BackgroundTaskResult.Success
   } catch {
     return BackgroundTask.BackgroundTaskResult.Failed

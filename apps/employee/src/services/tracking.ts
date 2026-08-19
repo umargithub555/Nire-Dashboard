@@ -207,25 +207,26 @@ export async function startOfficeTracking(policy: TrackingPolicy) {
   return { started: true }
 }
 
-export async function stopOfficeTracking() {
+export async function stopOfficeTracking(completely: boolean = false) {
   const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
   if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME)
 
-  const healthTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
-  if (healthTaskRegistered) await BackgroundTask.unregisterTaskAsync(LOCATION_HEALTH_TASK_NAME)
+  if (completely) {
+    const healthTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
+    if (healthTaskRegistered) await BackgroundTask.unregisterTaskAsync(LOCATION_HEALTH_TASK_NAME)
+  }
 }
 
-async function registerLocationHealthCheck() {
+export async function registerLocationHealthCheck() {
   const registered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
   if (registered) return
 
   await BackgroundTask.registerTaskAsync(LOCATION_HEALTH_TASK_NAME, {
-
     minimumInterval: 15,
   })
 }
 
-async function getSavedTrackingPolicy() {
+export async function getSavedTrackingPolicy() {
   const rawPolicy = await AsyncStorage.getItem(TRACKING_POLICY_KEY)
   if (!rawPolicy) return null
 
