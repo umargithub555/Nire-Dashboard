@@ -85,11 +85,36 @@ export default function DailyRouteMapModal({
     (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
   )
 
-  // 1. Fetch Road-snapped Polyline from API
+  // 1. Fetch Road-snapped Polyline from API (with instant client cache)
   useEffect(() => {
     if (!isOpen || sortedPoints.length === 0) return
 
     let isMounted = true
+
+    // Generate unique client storage cache key
+    const firstPoint = sortedPoints[0]
+    const lastPoint = sortedPoints[sortedPoints.length - 1]
+    const cacheKey = `nire_route_${sortedPoints.length}_${firstPoint.lat.toFixed(4)},${firstPoint.lng.toFixed(4)}_${lastPoint.lat.toFixed(4)},${lastPoint.lng.toFixed(4)}_${firstPoint.recorded_at || ''}_${lastPoint.recorded_at || ''}`
+
+    // Check client session cache
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        setRouteData(parsed)
+        setLoading(false)
+        return
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    // Set initial immediate baseline route to avoid any blank loading
+    setRouteData((prev) => prev ?? {
+      roadPolyline: sortedPoints.map((p) => [p.lat, p.lng]),
+      totalDistanceKm: 0,
+      stops: [],
+    })
     setLoading(true)
 
     fetch('/api/tracking/route-match', {
@@ -102,6 +127,11 @@ export default function DailyRouteMapModal({
         if (!isMounted) return
         setRouteData(data)
         setLoading(false)
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data))
+        } catch {
+          // ignore
+        }
       })
       .catch((err) => {
         console.warn('Failed to match road route, using raw points:', err)
