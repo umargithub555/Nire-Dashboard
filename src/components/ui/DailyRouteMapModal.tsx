@@ -8,13 +8,10 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Layers,
   Clock,
   Navigation,
   Sparkles,
   ChevronRight,
-  ChevronLeft,
-  Flame,
 } from 'lucide-react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -65,16 +62,15 @@ export default function DailyRouteMapModal({
   const playbackMarkerRef = useRef<L.Marker | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
-  const [loadingRoute, setLoading] = useState(true)
+  const [loadingRoute, setLoading] = useState(false)
   const [routeData, setRouteData] = useState<RouteMatchResult | null>(null)
-  const [activeBaseLayer, setActiveBaseLayer] = useState<'voyager' | 'osm' | 'satellite'>('voyager')
+  const [activeBaseLayer, setActiveBaseLayer] = useState<'osm' | 'voyager' | 'satellite'>('osm')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // Playback Animation State
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackProgress, setPlaybackProgress] = useState(0) // 0 to 100
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(1)
-  const animationFrameRef = useRef<number | null>(null)
 
   useClickAway(modalRef, () => {
     onClose()
@@ -91,7 +87,13 @@ export default function DailyRouteMapModal({
 
     let isMounted = true
 
-    // Generate unique client storage cache key
+    // Initial baseline route
+    const fallbackRoute: RouteMatchResult = {
+      roadPolyline: sortedPoints.map((p) => [p.lat, p.lng]),
+      totalDistanceKm: 0,
+      stops: [],
+    }
+
     const firstPoint = sortedPoints[0]
     const lastPoint = sortedPoints[sortedPoints.length - 1]
     const cacheKey = `nire_route_${sortedPoints.length}_${firstPoint.lat.toFixed(4)},${firstPoint.lng.toFixed(4)}_${lastPoint.lat.toFixed(4)},${lastPoint.lng.toFixed(4)}_${firstPoint.recorded_at || ''}_${lastPoint.recorded_at || ''}`
@@ -100,21 +102,15 @@ export default function DailyRouteMapModal({
     try {
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
-        const parsed = JSON.parse(cached)
-        setRouteData(parsed)
+        setRouteData(JSON.parse(cached))
         setLoading(false)
         return
       }
     } catch {
-      // ignore storage errors
+      // ignore
     }
 
-    // Set initial immediate baseline route to avoid any blank loading
-    setRouteData((prev) => prev ?? {
-      roadPolyline: sortedPoints.map((p) => [p.lat, p.lng]),
-      totalDistanceKm: 0,
-      stops: [],
-    })
+    setRouteData(fallbackRoute)
     setLoading(true)
 
     fetch('/api/tracking/route-match', {
@@ -136,11 +132,7 @@ export default function DailyRouteMapModal({
       .catch((err) => {
         console.warn('Failed to match road route, using raw points:', err)
         if (!isMounted) return
-        setRouteData({
-          roadPolyline: sortedPoints.map((p) => [p.lat, p.lng]),
-          totalDistanceKm: 0,
-          stops: [],
-        })
+        setRouteData(fallbackRoute)
         setLoading(false)
       })
 
@@ -149,48 +141,64 @@ export default function DailyRouteMapModal({
     }
   }, [isOpen, points])
 
-  // 2. Initialize Leaflet Map
+  // 2. Initialize & Manage Leaflet Map Instance
   useEffect(() => {
     if (!isOpen || !mapRef.current) return
 
-    if (!mapInstanceRef.current) {
-      const initialCenter: L.LatLngTuple =
-        sortedPoints.length > 0 ? [sortedPoints[0].lat, sortedPoints[0].lng] : [33.6844, 73.0479]
-
-      const map = L.map(mapRef.current, {
-        center: initialCenter,
-        zoom: 14,
-        zoomControl: false,
-      })
-
-      L.control.zoom({ position: 'topright' }).addTo(map)
-      mapInstanceRef.current = map
+    // Clean up any existing map instance before creating a new one
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove()
+      mapInstanceRef.current = null
     }
 
-    const map = mapInstanceRef.current
+    const initialCenter: L.LatLngTuple =
+      sortedPoints.length > 0 ? [sortedPoints[0].lat, sortedPoints[0].lng] : [33.6844, 73.0479]
 
-    // Set Basemap Layer
-    map.eachLayer((layer) => {
-      if (layer instanceof L.TileLayer) {
-        map.removeLayer(layer)
-      }
+    const map = L.map(mapRef.current, {
+      center: initialCenter,
+      zoom: 13,
+      zoomControl: false,
     })
 
-    let tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-    let attribution = '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+    L.control.zoom({ position: 'topright' }).addTo(map)
+    mapInstanceRef.current = map
 
-    if (activeBaseLayer === 'osm') {
-      tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-      attribution = '&copy; OpenStreetMap contributors'
+    // Apply Basemap Tile Layer
+    let tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    let attribution = '&copy; OpenStreetMap contributors'
+    let subdomains: string[] | string = 'abc'
+
+    if (activeBaseLayer === 'voyager') {
+      tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+      attribution = '&copy; CARTO &copy; OpenStreetMap'
+      subdomains = 'abcd'
     } else if (activeBaseLayer === 'satellite') {
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
       attribution = '&copy; Esri World Imagery'
+      subdomains = 'abc'
     }
 
-    L.tileLayer(tileUrl, { attribution, maxZoom: 19 }).addTo(map)
+    L.tileLayer(tileUrl, {
+      attribution,
+      maxZoom: 19,
+      subdomains,
+    }).addTo(map)
 
-    const timer = window.setTimeout(() => map.invalidateSize(), 150)
-    return () => window.clearTimeout(timer)
+    // Force multiple size invalidations to ensure proper rendering in modals
+    const timer1 = setTimeout(() => map.invalidateSize(), 50)
+    const timer2 = setTimeout(() => map.invalidateSize(), 200)
+    const timer3 = setTimeout(() => map.invalidateSize(), 500)
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+      }
+      playbackMarkerRef.current = null
+    }
   }, [isOpen, activeBaseLayer])
 
   // 3. Render Road Trail & Waypoint Nodes
@@ -201,6 +209,7 @@ export default function DailyRouteMapModal({
     // Clear previous vector layers
     if (polylineLayerRef.current) {
       map.removeLayer(polylineLayerRef.current)
+      polylineLayerRef.current = null
     }
 
     const featureGroup = L.featureGroup()
@@ -211,16 +220,16 @@ export default function DailyRouteMapModal({
       : rawCoords) as L.LatLngTuple[]
 
     if (roadCoords.length > 1) {
-      // 1. Soft glowing outer casing line
+      // Soft glowing outer casing line
       L.polyline(roadCoords, {
         color: '#059669',
         weight: 8,
-        opacity: 0.2,
+        opacity: 0.22,
         lineCap: 'round',
         lineJoin: 'round',
       }).addTo(featureGroup)
 
-      // 2. High-contrast vibrant road trail (Emerald Green #10b981)
+      // High-contrast vibrant road trail (Emerald Green #10b981)
       L.polyline(roadCoords, {
         color: '#10b981',
         weight: 4.5,
@@ -230,17 +239,16 @@ export default function DailyRouteMapModal({
       }).addTo(featureGroup)
     }
 
-    // 3. Render Waypoint Markers (Square nodes matching the reference design)
+    // Render Waypoint Markers
     sortedPoints.forEach((point, index) => {
       const isStart = index === 0
       const isFinish = index === sortedPoints.length - 1
 
       if (isStart) {
-        // Start Station Marker (Green Circle with white center)
         const startIcon = L.divIcon({
           className: 'custom-start-marker',
           html: `
-            <div style="position: relative; width: 22px; height: 22px; display: flex; items-center; justify-content: center;">
+            <div style="position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
               <div style="width: 22px; height: 22px; border-radius: 50%; background: #059669; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
                 <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
               </div>
@@ -259,7 +267,6 @@ export default function DailyRouteMapModal({
           </div>
         `)
       } else if (isFinish) {
-        // Last / Finish Station Marker with Radial Pulse Ring (Matching the user screenshot!)
         const finishIcon = L.divIcon({
           className: 'custom-finish-marker',
           html: `
@@ -281,7 +288,6 @@ export default function DailyRouteMapModal({
           </div>
         `)
       } else {
-        // Intermediate Waypoint Node (Square black-bordered white box like screenshot)
         const squareIcon = L.divIcon({
           className: 'custom-square-node',
           html: `
@@ -302,7 +308,7 @@ export default function DailyRouteMapModal({
       }
     })
 
-    // 4. Render Detected Stop / Dwell Points with Colorful Badges
+    // Render Stationary Stops
     routeData?.stops?.forEach((stop, idx) => {
       const stopIcon = L.divIcon({
         className: 'custom-stop-badge',
@@ -348,7 +354,6 @@ export default function DailyRouteMapModal({
 
     if (roadCoords.length < 2) return
 
-    // Create moving vehicle marker
     if (!playbackMarkerRef.current) {
       const movingIcon = L.divIcon({
         className: 'playback-moving-marker',
@@ -398,7 +403,6 @@ export default function DailyRouteMapModal({
     }
   }, [isPlaying, playbackProgress, playbackSpeed, routeData, sortedPoints, isOpen])
 
-  // Helper to focus on a single stop from sidebar
   function focusOnPoint(lat: number, lng: number) {
     const map = mapInstanceRef.current
     if (!map) return
@@ -448,17 +452,6 @@ export default function DailyRouteMapModal({
             <div className="flex items-center bg-zinc-100 p-1 rounded-lg border border-zinc-200/70 text-xs">
               <button
                 type="button"
-                onClick={() => setActiveBaseLayer('voyager')}
-                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                  activeBaseLayer === 'voyager'
-                    ? 'bg-white text-zinc-900 shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-800'
-                }`}
-              >
-                Clean
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveBaseLayer('osm')}
                 className={`px-2.5 py-1 rounded-md font-medium transition-all ${
                   activeBaseLayer === 'osm'
@@ -467,6 +460,17 @@ export default function DailyRouteMapModal({
                 }`}
               >
                 Streets
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveBaseLayer('voyager')}
+                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                  activeBaseLayer === 'voyager'
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                Clean
               </button>
               <button
                 type="button"
@@ -600,7 +604,6 @@ export default function DailyRouteMapModal({
 
         {/* Bottom Playback & Route Controller Strip */}
         <div className="border-t border-zinc-200 bg-white px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-          {/* Play / Pause / Replay Buttons */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -626,7 +629,6 @@ export default function DailyRouteMapModal({
               <RotateCcw size={14} />
             </button>
 
-            {/* Speed Toggle */}
             <div className="flex items-center bg-zinc-100 p-0.5 rounded-md border border-zinc-200 text-[11px] font-bold">
               {([1, 2, 4] as const).map((spd) => (
                 <button
@@ -645,7 +647,6 @@ export default function DailyRouteMapModal({
             </div>
           </div>
 
-          {/* Scrubber Timeline Slider */}
           <div className="flex-1 flex items-center gap-3 max-w-xl">
             <span className="text-[11px] font-semibold text-zinc-400 shrink-0">
               {firstPointTime
@@ -676,7 +677,6 @@ export default function DailyRouteMapModal({
             </span>
           </div>
 
-          {/* Total Trip Distance Badge */}
           <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-50 border border-zinc-200/80 text-xs font-bold text-zinc-800">
             <Navigation size={13} className="text-emerald-600" />
             <span>{totalDistance} km</span>
