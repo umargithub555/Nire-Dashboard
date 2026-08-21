@@ -71,11 +71,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'At least one valid location sample is required.' }, { status: 400 })
   }
 
-  const activePolicy = policy ?? {
-    office_start_time: '09:00',
-    office_end_time: '17:00',
-    timezone: 'Asia/Karachi',
-    sample_interval_minutes: 30,
+  const branch = ctx.employee.branch as any
+  const activePolicy = {
+    office_start_time: branch?.office_start_time || policy?.office_start_time || '09:00',
+    office_end_time: branch?.office_end_time || policy?.office_end_time || '17:00',
+    timezone: branch?.timezone || policy?.timezone || 'Asia/Karachi',
+    sample_interval_minutes: policy?.sample_interval_minutes || 5,
   }
   const acceptedPayload = payload.filter((sample) => (
     sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)

@@ -1,6 +1,7 @@
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Employee, TrackingPolicy } from '../types'
+import { formatTimeString } from '../lib/format'
 import {
   AppPermissionsState,
   openAppSettings,
@@ -57,7 +58,7 @@ export function ProfileView({
             <Text style={styles.name}>{employee.full_name}</Text>
             <Text style={styles.email}>{employee.email}</Text>
             <Text style={styles.shift}>
-              Shift: {policy.office_start_time.slice(0, 5)} – {policy.office_end_time.slice(0, 5)}
+              Shift: {formatTimeString(policy.office_start_time)} – {formatTimeString(policy.office_end_time)}
             </Text>
           </View>
         </View>

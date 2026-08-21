@@ -18,6 +18,20 @@ export function formatTime(value?: string | null) {
   }).format(new Date(value))
 }
 
+export function formatTimeString(timeStr?: string | null) {
+  if (!timeStr) return ''
+  const clean = timeStr.trim()
+  const parts = clean.split(':')
+  if (parts.length < 2) return clean
+  let hour = parseInt(parts[0], 10)
+  const min = parts[1].slice(0, 2)
+  if (isNaN(hour)) return clean
+  const period = hour >= 12 ? 'PM' : 'AM'
+  hour = hour % 12
+  if (hour === 0) hour = 12
+  return `${String(hour).padStart(2, '0')}:${min} ${period}`
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return 'Not recorded'
   return new Intl.DateTimeFormat('en-PK', {

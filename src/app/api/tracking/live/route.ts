@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let employeeQuery = service
     .from('employees')
-    .select('*, branch:branches(name, address)')
+    .select('*, branch:branches(id, name, address, office_start_time, office_end_time, grace_period_minutes, timezone)')
     .eq('is_active', true)
     .order('full_name')
 
@@ -51,15 +51,20 @@ export async function GET(req: NextRequest) {
   if (attendanceResult.error) return NextResponse.json({ error: attendanceResult.error.message }, { status: 500 })
   if (devicesResult.error) return NextResponse.json({ error: devicesResult.error.message }, { status: 500 })
 
+  const employeeMap = new Map((employeesResult.data ?? []).map((e: any) => [e.id, e]))
   const latestSamples = new Map<string, LocationSampleRow>()
-  const activePolicy = policy ?? {
-    office_start_time: '09:00',
-    office_end_time: '17:00',
-    timezone: 'Asia/Karachi',
-  }
 
   for (const sample of samplesResult.data ?? []) {
-    if (sample.source === 'scheduled' && !isWithinPolicyHoursAt(activePolicy, sample.recorded_at)) {
+    const emp = employeeMap.get(sample.employee_id) as any
+    const empBranch = emp?.branch
+    const empPolicy = {
+      office_start_time: empBranch?.office_start_time || policy?.office_start_time || '09:00',
+      office_end_time: empBranch?.office_end_time || policy?.office_end_time || '17:00',
+      timezone: empBranch?.timezone || policy?.timezone || 'Asia/Karachi',
+      sample_interval_minutes: policy?.sample_interval_minutes || 5,
+    }
+
+    if (sample.source === 'scheduled' && !isWithinPolicyHoursAt(empPolicy, sample.recorded_at)) {
       continue
     }
     if (!latestSamples.has(sample.employee_id)) latestSamples.set(sample.employee_id, sample)

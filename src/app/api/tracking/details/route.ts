@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const [employeeResult, dayAttendanceResult, monthAttendanceResult, dayVisitsResult, monthVisitsResult, daySamplesResult, monthSamplesResult] = await Promise.all([
     service
       .from('employees')
-      .select('id, full_name, designation, branch:branches(id, name)')
+      .select('id, full_name, designation, branch:branches(id, name, address, office_start_time, office_end_time, grace_period_minutes, timezone)')
       .eq('id', employeeId)
       .maybeSingle(),
     service
@@ -83,8 +83,15 @@ export async function GET(req: NextRequest) {
   if (failure?.error) return NextResponse.json({ error: failure.error.message }, { status: 500 })
   if (!employeeResult.data) return NextResponse.json({ error: 'Employee not found.' }, { status: 404 })
 
+  const branch = employeeResult.data.branch as any
+  const empPolicy = {
+    office_start_time: branch?.office_start_time || policy?.office_start_time || '09:00',
+    office_end_time: branch?.office_end_time || policy?.office_end_time || '17:00',
+    timezone: branch?.timezone || policy?.timezone || 'Asia/Karachi',
+  }
+
   const includeSample = (sample: { source: string; recorded_at: string }) => (
-    sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)
+    sample.source !== 'scheduled' || isWithinPolicyHoursAt(empPolicy, sample.recorded_at)
   )
   const daySamples = (daySamplesResult.data ?? []).filter(includeSample)
   const dayVisits = dayVisitsResult.data ?? []

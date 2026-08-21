@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Alert, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, Avatar, LoadingScreen, PageTitle, Panel, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
 import { useApp } from '../../src/providers/AppProvider'
+import { formatTimeString } from '../../src/lib/format'
 import { colors, radii, spacing } from '../../src/theme'
 import { openAutostartSettings, requestBatteryOptimizationExemption } from '../../src/services/alarmScheduler'
 
@@ -63,7 +64,12 @@ export default function ProfilePage() {
       <SectionTitle title="Tracking" />
       <Panel>
         <View style={styles.trackingHeader}><View style={styles.trackingIcon}><MapPin size={19} color={colors.teal} strokeWidth={2.4} /></View><View style={styles.trackingCopy}><Text style={styles.trackingTitle}>Office-hours tracking</Text><Text style={styles.trackingText}>{trackingMessage}</Text></View></View>
-        <View style={styles.policyRow}><CalendarClock size={17} color={colors.primary} /><Text style={styles.policyText}>{data.policy.office_start_time.slice(0, 5)} - {data.policy.office_end_time.slice(0, 5)} - Every {data.policy.sample_interval_minutes} minutes</Text></View>
+        <View style={styles.policyRow}>
+          <CalendarClock size={17} color={colors.primary} />
+          <Text style={styles.policyText}>
+            {formatTimeString(data.policy.office_start_time)} – {formatTimeString(data.policy.office_end_time)} · Every {data.policy.sample_interval_minutes} minutes
+          </Text>
+        </View>
         <ActionButton label="Check location access" icon={ShieldCheck} tone="soft" loading={checking} onPress={() => void checkPermissions()} />
       </Panel>
 

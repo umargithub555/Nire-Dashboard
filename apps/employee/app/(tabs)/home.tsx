@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import { CalendarCheck, ChevronRight, ClipboardList, Clock3, MapPinned, Navigation, RefreshCw } from 'lucide-react-native'
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, Avatar, IconButton, LoadingScreen, Metric, Panel, PageTitle, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
-import { formatDay, formatTime } from '../../src/lib/format'
+import { formatDate, formatDay, formatTime, formatTimeString } from '../../src/lib/format'
 import { getAttendanceStatus } from '../../src/lib/attendanceStatus'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors, radii, spacing } from '../../src/theme'
@@ -51,7 +51,9 @@ export default function HomePage() {
             tone={todayRecord ? (attStatus?.tone ?? (hasCheckedOut ? 'blue' : 'teal')) : 'amber'}
           />
         </View>
-        <Text style={styles.workdayTime}>{data.policy.office_start_time.slice(0, 5)} - {data.policy.office_end_time.slice(0, 5)}</Text>
+        <Text style={styles.workdayTime}>
+          {formatTimeString(data.policy.office_start_time)} – {formatTimeString(data.policy.office_end_time)}
+        </Text>
         <Text style={styles.workdayMessage}>{attStatus ? `${attStatus.details} · ${trackingMessage}` : trackingMessage}</Text>
         <ActionButton label={todayRecord && !hasCheckedOut ? 'Open attendance' : todayRecord ? 'View attendance' : 'Check in now'} icon={CalendarCheck} tone="primary" onPress={() => router.push('/attendance')} />
       </View>
