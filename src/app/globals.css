@@ -38,3 +38,18 @@
     @apply bg-white border border-zinc-200 rounded-xl p-4 shadow-sm transition-all;
   }
 }
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.4);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
