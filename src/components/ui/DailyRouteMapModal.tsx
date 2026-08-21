@@ -78,12 +78,12 @@ export default function DailyRouteMapModal({ isOpen, onClose, employeeName, date
         <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
           <div>
             <h2 className="font-semibold text-zinc-900">{employeeName}</h2>
-            <p className="text-xs text-zinc-500">{date} ? {points.length} captured locations</p>
+            <p className="text-xs text-zinc-500">{date} - {points.length} captured locations</p>
           </div>
           <button onClick={onClose} className="p-2 text-zinc-500 hover:bg-zinc-100" aria-label="Close daily route map"><X size={20} /></button>
         </div>
         {points.length > 0 ? <div ref={mapRef} className="h-[calc(100%-62px)] w-full" /> : <div className="grid h-[calc(100%-62px)] place-items-center text-sm text-zinc-400"><Route size={18} />No locations for this day</div>}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white/95 px-2.5 py-1.5 text-xs text-zinc-600 shadow-sm"><MapPin size={13} className="text-blue-600" />Green start ? Red last location</div>
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white/95 px-2.5 py-1.5 text-xs text-zinc-600 shadow-sm"><MapPin size={13} className="text-blue-600" />Green start - Red last location</div>
       </div>
     </div>
   )

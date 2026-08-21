@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { email, password, full_name, branch_id, designation, phone } = body
+  const { email, password, full_name, branch_id, designation, phone, salary } = body
   const origin = req.nextUrl.origin
   const service = createServiceClient()
 
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
     branch_id,
     designation,
     phone,
+    salary: typeof salary === 'number' || typeof salary === 'string' ? Number(salary) || 0 : 0,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -111,7 +112,7 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Missing employee ID' }, { status: 400 })
 
   const body = await req.json()
-  const { email, full_name, branch_id, designation, phone, is_active } = body
+  const { email, full_name, branch_id, designation, phone, is_active, salary } = body
   const service = createServiceClient()
 
   // Fetch current record
@@ -142,6 +143,7 @@ export async function PUT(req: NextRequest) {
       designation,
       phone,
       is_active,
+      salary: typeof salary === 'number' || typeof salary === 'string' ? Number(salary) || 0 : 0,
     })
     .eq('id', id)
     .select()

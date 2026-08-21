@@ -3,6 +3,7 @@ import { CalendarCheck, ChevronRight, ClipboardList, Clock3, MapPinned, Navigati
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, Avatar, IconButton, LoadingScreen, Metric, Panel, PageTitle, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
 import { formatDay, formatTime } from '../../src/lib/format'
+import { getAttendanceStatus } from '../../src/lib/attendanceStatus'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors, radii, spacing } from '../../src/theme'
 
@@ -14,12 +15,13 @@ export default function HomePage() {
   if (!data) return <LoadingScreen label="Loading your employee workspace..." />
 
   const hasCheckedOut = Boolean(todayRecord?.clock_out_at)
+  const attStatus = getAttendanceStatus(todayRecord, data.policy)
   const attendanceTitle = !todayRecord ? 'Ready to start your day' : hasCheckedOut ? 'Workday completed' : 'Checked in today'
   const attendanceDetail = !todayRecord
     ? 'Capture your current location to check in.'
     : hasCheckedOut
-      ? `Checked out at ${formatTime(todayRecord.clock_out_at)}`
-      : `Checked in at ${formatTime(todayRecord.clock_in_at)}`
+      ? `Checked out at ${formatTime(todayRecord.clock_out_at)}${attStatus ? ` (${attStatus.label})` : ''}`
+      : `Checked in at ${formatTime(todayRecord.clock_in_at)}${attStatus ? ` (${attStatus.label})` : ''}`
 
   async function captureLocation() {
     try {
@@ -42,9 +44,15 @@ export default function HomePage() {
       </View>
 
       <View style={styles.workday}>
-        <View style={styles.workdayTop}><Text style={styles.workdayEyebrow}>Today?s workday</Text><StatusPill label={todayRecord ? hasCheckedOut ? 'Completed' : 'Checked in' : 'Not checked in'} tone={todayRecord ? hasCheckedOut ? 'blue' : 'teal' : 'amber'} /></View>
+        <View style={styles.workdayTop}>
+          <Text style={styles.workdayEyebrow}>Today&apos;s workday</Text>
+          <StatusPill
+            label={todayRecord ? (attStatus?.label ?? (hasCheckedOut ? 'Completed' : 'Checked in')) : 'Not checked in'}
+            tone={todayRecord ? (attStatus?.tone ?? (hasCheckedOut ? 'blue' : 'teal')) : 'amber'}
+          />
+        </View>
         <Text style={styles.workdayTime}>{data.policy.office_start_time.slice(0, 5)} - {data.policy.office_end_time.slice(0, 5)}</Text>
-        <Text style={styles.workdayMessage}>{trackingMessage}</Text>
+        <Text style={styles.workdayMessage}>{attStatus ? `${attStatus.details} · ${trackingMessage}` : trackingMessage}</Text>
         <ActionButton label={todayRecord && !hasCheckedOut ? 'Open attendance' : todayRecord ? 'View attendance' : 'Check in now'} icon={CalendarCheck} tone="primary" onPress={() => router.push('/attendance')} />
       </View>
 
@@ -55,7 +63,7 @@ export default function HomePage() {
 
       <SectionTitle title="Current location" action={<IconButton icon={RefreshCw} label="Refresh current location" onPress={() => void captureLocation()} disabled={loading} />} />
       <Panel>
-        <View style={styles.locationHeading}><View style={styles.locationIcon}><Navigation size={19} color={colors.primary} strokeWidth={2.4} /></View><View style={styles.locationCopy}><Text style={styles.locationTitle}>{latestLocation?.address || 'Location not captured yet'}</Text><Text style={styles.locationMeta}>{latestLocation ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)} m` : 'unknown'} ? ${formatTime(latestLocation.recorded_at)}` : 'Use the refresh button to capture your current location.'}</Text></View></View>
+        <View style={styles.locationHeading}><View style={styles.locationIcon}><Navigation size={19} color={colors.primary} strokeWidth={2.4} /></View><View style={styles.locationCopy}><Text style={styles.locationTitle}>{latestLocation?.address || 'Location not captured yet'}</Text><Text style={styles.locationMeta}>{latestLocation ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)} m` : 'unknown'} - ${formatTime(latestLocation.recorded_at)}` : 'Use the refresh button to capture your current location.'}</Text></View></View>
         {latestLocation ? <Pressable onPress={openMap} style={({ pressed }) => [styles.mapRow, pressed && styles.pressed]}><MapPinned size={17} color={colors.primary} /><Text style={styles.mapRowText}>Open location on map</Text><ChevronRight size={17} color={colors.inkMuted} /></Pressable> : null}
       </Panel>
 

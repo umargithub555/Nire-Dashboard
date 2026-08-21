@@ -2,6 +2,10 @@ export type Branch = {
   id: string
   name: string
   address: string | null
+  office_start_time?: string
+  office_end_time?: string
+  grace_period_minutes?: number
+  timezone?: string
   created_at: string
 }
 
@@ -13,6 +17,7 @@ export type Employee = {
   email: string
   phone: string | null
   designation: string | null
+  salary?: number | null
   avatar_url: string | null
   is_active: boolean
   created_at: string

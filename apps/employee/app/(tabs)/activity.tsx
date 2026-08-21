@@ -2,6 +2,7 @@ import { CalendarDays, CheckCircle2, ClipboardList, Clock3, MapPin, TrendingUp }
 import { StyleSheet, Text, View } from 'react-native'
 import { EmptyState, LoadingScreen, Metric, PageTitle, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
 import { formatDate, formatTime } from '../../src/lib/format'
+import { getAttendanceStatus } from '../../src/lib/attendanceStatus'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors, radii, spacing } from '../../src/theme'
 
@@ -28,14 +29,31 @@ export default function ActivityPage() {
       <SectionTitle title="Attendance history" />
       {attendance.length === 0 ? <EmptyState title="No attendance history" description="Completed check-ins will appear here." icon={CalendarDays} /> : (
         <View style={styles.list}>
-          {attendance.map((record) => <View key={record.id} style={styles.row}><View style={styles.rowIcon}><Clock3 size={17} color={colors.primary} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>{formatDate(`${record.date}T12:00:00+05:00`)}</Text><Text style={styles.rowMeta}>In {formatTime(record.clock_in_at)}{record.clock_out_at ? ` ? Out ${formatTime(record.clock_out_at)}` : ' ? Checkout pending'}</Text></View><StatusPill label={record.clock_out_at ? 'Done' : 'Open'} tone={record.clock_out_at ? 'blue' : 'teal'} /></View>)}
+          {attendance.map((record) => {
+            const recStatus = getAttendanceStatus(record, data.policy)
+            return (
+              <View key={record.id} style={styles.row}>
+                <View style={styles.rowIcon}><Clock3 size={17} color={colors.primary} /></View>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>{formatDate(`${record.date}T12:00:00+05:00`)}</Text>
+                  <Text style={styles.rowMeta}>
+                    In {formatTime(record.clock_in_at)}{record.clock_out_at ? ` - Out ${formatTime(record.clock_out_at)}` : ' - Checkout pending'}
+                  </Text>
+                </View>
+                <StatusPill
+                  label={recStatus?.label ?? (record.clock_out_at ? 'Done' : 'Open')}
+                  tone={recStatus?.tone ?? (record.clock_out_at ? 'blue' : 'teal')}
+                />
+              </View>
+            )
+          })}
         </View>
       )}
 
       <SectionTitle title="Visit history" />
       {visits.length === 0 ? <EmptyState title="No visit history" description="Saved client or field visits will appear here." icon={ClipboardList} /> : (
         <View style={styles.list}>
-          {visits.map((visit) => <View key={visit.id} style={styles.row}><View style={[styles.rowIcon, styles.visitIcon]}><MapPin size={17} color={colors.coral} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>{visit.purpose}</Text><Text style={styles.rowMeta} numberOfLines={2}>{visit.place_name || visit.address || 'Location name unavailable'} ? {formatDate(visit.visited_at)}</Text></View></View>)}
+          {visits.map((visit) => <View key={visit.id} style={styles.row}><View style={[styles.rowIcon, styles.visitIcon]}><MapPin size={17} color={colors.coral} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>{visit.purpose}</Text><Text style={styles.rowMeta} numberOfLines={2}>{visit.place_name || visit.address || 'Location name unavailable'} - {formatDate(visit.visited_at)}</Text></View></View>)}
         </View>
       )}
     </Screen>

@@ -10,8 +10,16 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
+  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone } = body
   const service = createServiceClient()
-  const { data, error } = await service.from('branches').insert(body).select().single()
+  const { data, error } = await service.from('branches').insert({
+    name,
+    address,
+    office_start_time: office_start_time || '09:00',
+    office_end_time: office_end_time || '17:00',
+    grace_period_minutes: typeof grace_period_minutes === 'number' ? grace_period_minutes : 20,
+    timezone: timezone || 'Asia/Karachi',
+  }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
@@ -22,12 +30,19 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Missing branch ID' }, { status: 400 })
 
   const body = await req.json()
-  const { name, address } = body
+  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone } = body
   const service = createServiceClient()
 
   const { data, error } = await service
     .from('branches')
-    .update({ name, address })
+    .update({
+      name,
+      address,
+      office_start_time: office_start_time || '09:00',
+      office_end_time: office_end_time || '17:00',
+      grace_period_minutes: typeof grace_period_minutes === 'number' ? grace_period_minutes : 20,
+      timezone: timezone || 'Asia/Karachi',
+    })
     .eq('id', id)
     .select()
     .single()

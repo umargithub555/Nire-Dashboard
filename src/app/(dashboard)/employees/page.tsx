@@ -15,6 +15,7 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({
     full_name: '', email: '', password: '',
     phone: '', designation: '', branch_id: '',
+    salary: '',
     is_active: true
   })
 
@@ -38,6 +39,7 @@ export default function EmployeesPage() {
       phone: emp.phone || '',
       designation: emp.designation || '',
       branch_id: emp.branch_id || '',
+      salary: emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '',
       is_active: emp.is_active
     })
     setShowModal(true)
@@ -47,7 +49,7 @@ export default function EmployeesPage() {
     setShowModal(false)
     setEditEmployee(null)
     setShowPassword(false)
-    setForm({ full_name: '', email: '', password: '', phone: '', designation: '', branch_id: '', is_active: true })
+    setForm({ full_name: '', email: '', password: '', phone: '', designation: '', branch_id: '', salary: '', is_active: true })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -116,6 +118,7 @@ export default function EmployeesPage() {
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Name</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Branch</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Designation</th>
+              <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Monthly Salary</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Phone</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
               <th className="text-right px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Actions</th>
@@ -124,7 +127,7 @@ export default function EmployeesPage() {
           <tbody className="divide-y divide-zinc-100">
             {employees.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-zinc-400">No employees found</td>
+                <td colSpan={7} className="text-center py-10 text-zinc-400">No employees found</td>
               </tr>
             )}
             {employees.map((emp: any) => (
@@ -142,6 +145,9 @@ export default function EmployeesPage() {
                 </td>
                 <td className="px-6 py-4 text-zinc-600 font-medium">{emp.branch?.name ?? '—'}</td>
                 <td className="px-6 py-4 text-zinc-600 font-medium">{emp.designation ?? '—'}</td>
+                <td className="px-6 py-4 text-zinc-800 font-semibold">
+                  {emp.salary ? `₨ ${Number(emp.salary).toLocaleString('en-PK')}` : '—'}
+                </td>
                 <td className="px-6 py-4 text-zinc-500">{emp.phone ?? '—'}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -205,6 +211,12 @@ export default function EmployeesPage() {
                   {emp.designation}
                 </div>
               )}
+              {emp.salary ? (
+                <div className="flex items-center gap-2 text-xs text-emerald-700 font-semibold">
+                  <span>₨</span>
+                  {Number(emp.salary).toLocaleString('en-PK')} / month
+                </div>
+              ) : null}
               {emp.phone && (
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
                   <Phone size={12} className="text-zinc-400" />
@@ -242,6 +254,7 @@ export default function EmployeesPage() {
                 { key: 'email', label: 'Email', type: 'email', placeholder: 'ahmad@company.com' },
                 ...(editEmployee ? [] : [{ key: 'password', label: 'Temporary password', type: 'password', placeholder: 'Min 6 characters' }]),
                 { key: 'designation', label: 'Designation', type: 'text', placeholder: 'e.g. Branch Manager' },
+                { key: 'salary', label: 'Monthly Salary (PKR)', type: 'number', placeholder: 'e.g. 50000' },
                 { key: 'phone', label: 'Phone', type: 'tel', placeholder: '+92 300 0000000' },
               ].map(({ key, label, type, placeholder }) => (
                 <div key={key}>

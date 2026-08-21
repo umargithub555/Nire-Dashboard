@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, Building2, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Building2, Pencil, Trash2, Clock } from 'lucide-react'
 import { Branch } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -9,7 +9,13 @@ export default function BranchesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editBranch, setEditBranch] = useState<Branch | null>(null)
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null)
-  const [form, setForm] = useState({ name: '', address: '' })
+  const [form, setForm] = useState({
+    name: '',
+    address: '',
+    office_start_time: '09:00',
+    office_end_time: '17:00',
+    grace_period_minutes: 20,
+  })
   const [loading, setLoading] = useState(false)
 
   async function load() {
@@ -21,14 +27,26 @@ export default function BranchesPage() {
 
   function handleOpenEdit(branch: Branch) {
     setEditBranch(branch)
-    setForm({ name: branch.name, address: branch.address || '' })
+    setForm({
+      name: branch.name,
+      address: branch.address || '',
+      office_start_time: (branch.office_start_time || '09:00').slice(0, 5),
+      office_end_time: (branch.office_end_time || '17:00').slice(0, 5),
+      grace_period_minutes: branch.grace_period_minutes ?? 20,
+    })
     setShowModal(true)
   }
 
   function handleCloseModal() {
     setShowModal(false)
     setEditBranch(null)
-    setForm({ name: '', address: '' })
+    setForm({
+      name: '',
+      address: '',
+      office_start_time: '09:00',
+      office_end_time: '17:00',
+      grace_period_minutes: 20,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,6 +88,19 @@ export default function BranchesPage() {
       toast.error(err.error)
     }
     setLoading(false)
+  }
+
+  function formatBranchTiming(start?: string, end?: string) {
+    if (!start || !end) return '09:00 AM - 05:00 PM'
+    try {
+      const d1 = new Date(`2000-01-01T${start.slice(0, 5)}:00`)
+      const d2 = new Date(`2000-01-01T${end.slice(0, 5)}:00`)
+      const sStr = d1.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const eStr = d2.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      return `${sStr} - ${eStr}`
+    } catch {
+      return `${start.slice(0, 5)} - ${end.slice(0, 5)}`
+    }
   }
 
   return (
@@ -122,6 +153,12 @@ export default function BranchesPage() {
               </div>
               <div className="font-semibold text-zinc-900 text-base lg:text-lg leading-snug">{branch.name}</div>
               {branch.address && <div className="text-sm text-zinc-500 mt-1.5 line-clamp-2 leading-relaxed">{branch.address}</div>}
+
+              <div className="mt-3.5 pt-3 border-t border-zinc-100 flex items-center gap-1.5 text-xs font-medium text-zinc-600">
+                <Clock size={13} className="text-blue-600 shrink-0" />
+                <span>{formatBranchTiming(branch.office_start_time, branch.office_end_time)}</span>
+                <span className="text-zinc-400">({branch.grace_period_minutes ?? 20}m grace)</span>
+              </div>
             </div>
           </div>
         ))}
@@ -139,7 +176,7 @@ export default function BranchesPage() {
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="e.g. Rawalpindi Main"
+                  placeholder="e.g. Peshawar Main"
                   required
                 />
               </div>
@@ -152,6 +189,43 @@ export default function BranchesPage() {
                   placeholder="Street address"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1.5">Office Start Time</label>
+                  <input
+                    type="time"
+                    value={form.office_start_time}
+                    onChange={e => setForm(f => ({ ...f, office_start_time: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1.5">Office End Time</label>
+                  <input
+                    type="time"
+                    value={form.office_end_time}
+                    onChange={e => setForm(f => ({ ...f, office_end_time: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5">Check-in Grace Period (minutes)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="120"
+                  value={form.grace_period_minutes}
+                  onChange={e => setForm(f => ({ ...f, grace_period_minutes: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  required
+                />
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={handleCloseModal}
                   className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors">

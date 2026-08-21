@@ -143,7 +143,7 @@ export default function EmployeeTrackingDetails() {
               <div className="flex flex-col gap-3 border-b border-zinc-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-semibold text-zinc-900">Daily location trail</h3>
-                  <p className="mt-0.5 text-xs text-zinc-500">{format(new Date(`${date}T00:00:00`), 'EEEE, MMMM d, yyyy')} ? {details.day.summary.sample_count} samples</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">{format(new Date(`${date}T00:00:00`), 'EEEE, MMMM d, yyyy')} - {details.day.summary.sample_count} samples</p>
                 </div>
                 <button disabled={details.day.samples.length === 0} onClick={() => setRouteOpen(true)} className="inline-flex items-center justify-center gap-1.5 border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"><Map size={14} />View day map</button>
               </div>
@@ -155,7 +155,7 @@ export default function EmployeeTrackingDetails() {
                     <MapPin size={15} className="mt-0.5 shrink-0 text-blue-600" />
                     <div className="min-w-0">
                       <div className="text-sm text-zinc-800">{sample.address || `${sample.lat.toFixed(5)}, ${sample.lng.toFixed(5)}`}</div>
-                      <div className="mt-0.5 text-xs text-zinc-400">{sample.source.replaceAll('_', ' ')} - accuracy {sample.accuracy_meters ? `${Math.round(sample.accuracy_meters)} m` : 'unknown'}{sample.mocked ? ' ? mocked' : ''}</div>
+                      <div className="mt-0.5 text-xs text-zinc-400">{sample.source.replaceAll('_', ' ')} - accuracy {sample.accuracy_meters ? `${Math.round(sample.accuracy_meters)} m` : 'unknown'}{sample.mocked ? ' - mocked' : ''}</div>
                     </div>
                   </div>
                 ))}
@@ -186,7 +186,7 @@ export default function EmployeeTrackingDetails() {
                 <div className="border-b border-zinc-100 px-4 py-4"><h3 className="font-semibold text-zinc-900">Places reached</h3></div>
                 {details.day.places.length === 0 ? <div className="px-4 py-8 text-sm text-zinc-400">Address names appear every 30 minutes after the next APK update.</div> : (
                   <div className="divide-y divide-zinc-100">
-                    {details.day.places.map((place) => <div key={place.address} className="px-4 py-3"><div className="text-sm text-zinc-800">{place.address}</div><div className="mt-0.5 text-xs text-zinc-400">{place.first_seen_at ? `First seen ${format(new Date(place.first_seen_at), 'hh:mm a')}` : 'Recorded this month'} ? {place.source.replaceAll('_', ' ')}</div></div>)}
+                    {details.day.places.map((place) => <div key={place.address} className="px-4 py-3"><div className="text-sm text-zinc-800">{place.address}</div><div className="mt-0.5 text-xs text-zinc-400">{place.first_seen_at ? `First seen ${format(new Date(place.first_seen_at), 'hh:mm a')}` : 'Recorded this month'} - {place.source.replaceAll('_', ' ')}</div></div>)}
                   </div>
                 )}
               </div>

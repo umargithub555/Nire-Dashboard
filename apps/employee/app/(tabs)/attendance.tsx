@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, EmptyState, LoadingScreen, Panel, PageTitle, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
 import { formatDate, formatTime } from '../../src/lib/format'
+import { getAttendanceStatus } from '../../src/lib/attendanceStatus'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors, radii, spacing } from '../../src/theme'
 
@@ -16,6 +17,7 @@ export default function AttendancePage() {
   const checkedOut = Boolean(todayRecord?.clock_out_at)
   const action = !todayRecord ? 'in' : checkedOut ? null : 'out'
   const actionLabel = action === 'in' ? 'Check in with current location' : 'Check out with current location'
+  const todayStatus = getAttendanceStatus(todayRecord, data.policy)
 
   async function submit() {
     if (!action) return
@@ -39,7 +41,17 @@ export default function AttendancePage() {
       <PageTitle eyebrow={formatDate(new Date().toISOString())} title="Attendance" />
 
       <View style={styles.hero}>
-        <View style={styles.heroTop}><View><Text style={styles.heroEyebrow}>Today</Text><Text style={styles.heroTitle}>{checkedOut ? 'Workday complete' : todayRecord ? 'You are checked in' : 'Ready when you are'}</Text></View><StatusPill label={checkedOut ? 'Complete' : todayRecord ? 'Active' : 'Pending'} tone={checkedOut ? 'blue' : todayRecord ? 'teal' : 'amber'} /></View>
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroEyebrow}>Today</Text>
+            <Text style={styles.heroTitle}>{checkedOut ? 'Workday complete' : todayRecord ? 'You are checked in' : 'Ready when you are'}</Text>
+            {todayStatus ? <Text style={styles.heroStatusNote}>{todayStatus.details}</Text> : null}
+          </View>
+          <StatusPill
+            label={todayStatus?.label ?? (checkedOut ? 'Complete' : todayRecord ? 'Active' : 'Pending')}
+            tone={todayStatus?.tone ?? (checkedOut ? 'blue' : todayRecord ? 'teal' : 'amber')}
+          />
+        </View>
         <View style={styles.timeline}>
           <TimelineItem title="Check in" value={todayRecord ? formatTime(todayRecord.clock_in_at) : 'Not yet recorded'} complete={Boolean(todayRecord)} />
           <View style={styles.timelineLine} />
@@ -50,7 +62,7 @@ export default function AttendancePage() {
 
       <SectionTitle title="Location for attendance" />
       <Panel>
-        <View style={styles.locationRow}><View style={styles.locationIcon}><Navigation size={19} color={colors.primary} strokeWidth={2.4} /></View><View style={styles.locationCopy}><Text style={styles.locationTitle}>{latestLocation?.address || 'Current location will be captured when you check in or out.'}</Text><Text style={styles.locationMeta}>{latestLocation ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)} m` : 'unknown'} ? Last updated ${formatTime(latestLocation.recorded_at)}` : 'Location services need to be available to save attendance.'}</Text></View></View>
+        <View style={styles.locationRow}><View style={styles.locationIcon}><Navigation size={19} color={colors.primary} strokeWidth={2.4} /></View><View style={styles.locationCopy}><Text style={styles.locationTitle}>{latestLocation?.address || 'Current location will be captured when you check in or out.'}</Text><Text style={styles.locationMeta}>{latestLocation ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)} m` : 'unknown'} - Last updated ${formatTime(latestLocation.recorded_at)}` : 'Location services need to be available to save attendance.'}</Text></View></View>
         {latestLocation ? <Pressable onPress={openMap} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}><MapPinned size={17} color={colors.primary} /><Text style={styles.mapButtonText}>Review on map</Text></Pressable> : null}
       </Panel>
 
@@ -59,7 +71,23 @@ export default function AttendancePage() {
       <SectionTitle title="Recent attendance" />
       {attendance.length === 0 ? <EmptyState title="No attendance yet" description="Your check-in history will appear here." icon={CalendarCheck} /> : (
         <View style={styles.history}>
-          {attendance.map((record) => <View key={record.id} style={styles.historyRow}><View><Text style={styles.historyDate}>{formatDate(`${record.date}T12:00:00+05:00`)}</Text><Text style={styles.historyMeta}>{formatTime(record.clock_in_at)} - {record.clock_out_at ? formatTime(record.clock_out_at) : 'Checkout pending'}</Text></View><StatusPill label={record.clock_out_at ? 'Completed' : 'Open'} tone={record.clock_out_at ? 'blue' : 'teal'} /></View>)}
+          {attendance.map((record) => {
+            const recStatus = getAttendanceStatus(record, data.policy)
+            return (
+              <View key={record.id} style={styles.historyRow}>
+                <View>
+                  <Text style={styles.historyDate}>{formatDate(`${record.date}T12:00:00+05:00`)}</Text>
+                  <Text style={styles.historyMeta}>
+                    {formatTime(record.clock_in_at)} - {record.clock_out_at ? formatTime(record.clock_out_at) : 'Checkout pending'}
+                  </Text>
+                </View>
+                <StatusPill
+                  label={recStatus?.label ?? (record.clock_out_at ? 'Completed' : 'Open')}
+                  tone={recStatus?.tone ?? (record.clock_out_at ? 'blue' : 'teal')}
+                />
+              </View>
+            )
+          })}
         </View>
       )}
     </Screen>
@@ -75,6 +103,7 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
   heroEyebrow: { color: colors.inkMuted, fontSize: 12, fontWeight: '800', marginBottom: 4 },
   heroTitle: { color: colors.ink, fontSize: 23, fontWeight: '900' },
+  heroStatusNote: { color: colors.inkMuted, fontSize: 12, marginTop: 4, fontWeight: '600' },
   timeline: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   timelineItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   timelineLine: { width: 20, height: 1, backgroundColor: colors.border },
