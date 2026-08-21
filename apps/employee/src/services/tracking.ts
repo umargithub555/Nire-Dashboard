@@ -6,10 +6,11 @@ import * as Location from 'expo-location'
 import * as Network from 'expo-network'
 import * as BackgroundTask from 'expo-background-task'
 import * as TaskManager from 'expo-task-manager'
-import { AppState, Platform } from 'react-native'
+import { AppState, PermissionsAndroid, Platform } from 'react-native'
 import { apiFetch } from '../lib/api'
 import { getInstallationId } from '../lib/install'
 import { LocationPayload, TrackingPolicy } from '../types'
+import { startTrackingService, stopTrackingService } from './alarmScheduler'
 
 export const LOCATION_TASK_NAME = 'nire-office-hours-location'
 export const LOCATION_HEALTH_TASK_NAME = 'nire-location-health-check'
@@ -20,6 +21,10 @@ const TRACKING_POLICY_KEY = 'nire.trackingPolicy'
 const LAST_SCHEDULED_UPLOAD_AT_KEY = 'nire.lastScheduledUploadAt'
 
 export async function requestLocationPermissions() {
+  if (Platform.OS === 'android' && Platform.Version >= 33) {
+    await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => 'denied')
+  }
+
   const foreground = await Location.requestForegroundPermissionsAsync()
   let background = await Location.getBackgroundPermissionsAsync()
 
@@ -178,24 +183,37 @@ export async function addScheduledAddressIfDue(samples: LocationPayload[]) {
 export async function startOfficeTracking(policy: TrackingPolicy) {
   await AsyncStorage.setItem(TRACKING_POLICY_KEY, JSON.stringify(policy))
   const permissions = await getLocationReadiness()
-  await uploadDeviceStatus({ last_error: null })
+  console.log('[Tracking] startOfficeTracking permissions:', JSON.stringify(permissions))
+  await uploadDeviceStatus({
+    last_error: null,
+    permission_foreground: permissions.foreground,
+    permission_background: permissions.background,
+    location_services_enabled: permissions.servicesEnabled,
+  })
   if (!permissions.foreground || !permissions.background || !permissions.servicesEnabled) {
-    return { started: false, reason: 'Location permissions or services are missing.' }
+    const missing = [
+      !permissions.foreground && 'foreground location',
+      !permissions.background && 'background location (Allow all the time)',
+      !permissions.servicesEnabled && 'GPS/location services',
+    ].filter(Boolean).join(', ')
+    console.warn(`[Tracking] Cannot start: missing ${missing}`)
+    return { started: false, reason: `Missing permissions: ${missing}. Please allow location access (all the time) in Settings.` }
   }
 
   const intervalMs = policy.sample_interval_minutes * 60 * 1000
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
   if (alreadyStarted) {
     await registerLocationHealthCheck()
+    await startTrackingService().catch(() => undefined)
     return { started: true }
   }
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
+    accuracy: Location.Accuracy.High,
     timeInterval: intervalMs,
-    deferredUpdatesInterval: intervalMs,
     distanceInterval: 0,
     pausesUpdatesAutomatically: false,
+    showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: 'Nire tracking active',
       notificationBody: 'Office-hours location tracking is running.',
@@ -204,12 +222,14 @@ export async function startOfficeTracking(policy: TrackingPolicy) {
   })
 
   await registerLocationHealthCheck()
+  await startTrackingService().catch(() => undefined)
   return { started: true }
 }
 
 export async function stopOfficeTracking(completely: boolean = false) {
   const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
   if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME)
+  await stopTrackingService().catch(() => undefined)
 
   if (completely) {
     const healthTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
@@ -217,11 +237,12 @@ export async function stopOfficeTracking(completely: boolean = false) {
   }
 }
 
-export async function registerLocationHealthCheck() {
+async function registerLocationHealthCheck() {
   const registered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
   if (registered) return
 
   await BackgroundTask.registerTaskAsync(LOCATION_HEALTH_TASK_NAME, {
+
     minimumInterval: 15,
   })
 }
@@ -239,14 +260,42 @@ export async function getSavedTrackingPolicy() {
 }
 
 export function isWithinOfficeHours(policy: TrackingPolicy, now = new Date()) {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const [startHour, startMinute] = policy.office_start_time.split(':').map(Number)
-  const [endHour, endMinute] = policy.office_end_time.split(':').map(Number)
-  const start = startHour * 60 + startMinute
-  const end = endHour * 60 + endMinute
+  try {
+    // Use the policy's configured timezone so the check is correct regardless of device timezone
+    const tz = policy.timezone ?? 'Asia/Karachi'
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now)
+    const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10)
+    const minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
+    const currentMinutes = hour * 60 + minute
 
-  if (start <= end) return currentMinutes >= start && currentMinutes <= end
-  return currentMinutes >= start || currentMinutes <= end
+    const [startHour, startMinute] = policy.office_start_time.split(':').map(Number)
+    const [endHour, endMinute] = policy.office_end_time.split(':').map(Number)
+    const start = startHour * 60 + startMinute
+    // Add grace period as a trailing buffer so the last samples at shift end are never missed
+    const graceMins = policy.grace_period_minutes ?? 0
+    const end = endHour * 60 + endMinute + graceMins
+
+    const result = start <= end
+      ? currentMinutes >= start && currentMinutes <= end
+      : currentMinutes >= start || currentMinutes <= end
+
+    console.log(`[Tracking] isWithinOfficeHours: ${hour}:${String(minute).padStart(2, '0')} (${tz}) | window=${policy.office_start_time}-${policy.office_end_time}+${graceMins}min | active=${result}`)
+    return result
+  } catch {
+    // Fallback: compare using device local time
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const [startHour, startMinute] = policy.office_start_time.split(':').map(Number)
+    const [endHour, endMinute] = policy.office_end_time.split(':').map(Number)
+    const start = startHour * 60 + startMinute
+    const end = endHour * 60 + endMinute + (policy.grace_period_minutes ?? 0)
+    if (start <= end) return currentMinutes >= start && currentMinutes <= end
+    return currentMinutes >= start || currentMinutes <= end
+  }
 }
 
 export function normalizeLocation(

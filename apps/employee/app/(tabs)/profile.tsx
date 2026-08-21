@@ -1,9 +1,10 @@
-import { Building2, CalendarClock, LogOut, MapPin, ShieldCheck, Smartphone, UserRoundCheck } from 'lucide-react-native'
+import { BatteryCharging, Building2, CalendarClock, LogOut, MapPin, ShieldCheck, Smartphone, UserRoundCheck, Zap } from 'lucide-react-native'
 import { useState } from 'react'
 import { Alert, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, Avatar, LoadingScreen, PageTitle, Panel, Screen, SectionTitle, StatusPill } from '../../src/components/ui'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors, radii, spacing } from '../../src/theme'
+import { openAutostartSettings, requestBatteryOptimizationExemption } from '../../src/services/alarmScheduler'
 
 export default function ProfilePage() {
   const { data, loading, requestLocationAccess, signOut, trackingMessage } = useApp()
@@ -66,9 +67,13 @@ export default function ProfilePage() {
         <ActionButton label="Check location access" icon={ShieldCheck} tone="soft" loading={checking} onPress={() => void checkPermissions()} />
       </Panel>
 
-      <SectionTitle title="Device" />
+      <SectionTitle title="Device & Background Protection" />
       <Panel>
-        <View style={styles.device}><View style={styles.deviceIcon}><Smartphone size={19} color={colors.primary} /></View><View style={styles.trackingCopy}><Text style={styles.trackingTitle}>This device</Text><Text style={styles.trackingText}>Location access is used for attendance, visits, and scheduled workday samples.</Text></View></View>
+        <View style={styles.device}><View style={styles.deviceIcon}><Smartphone size={19} color={colors.primary} /></View><View style={styles.trackingCopy}><Text style={styles.trackingTitle}>Background Reliability</Text><Text style={styles.trackingText}>Ensure tracking runs uninterrupted when your screen is locked.</Text></View></View>
+        <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
+          <ActionButton label="Configure Autostart (Xiaomi / Samsung)" icon={Zap} tone="soft" onPress={() => void openAutostartSettings()} />
+          <ActionButton label="Unrestricted Battery Saver" icon={BatteryCharging} tone="soft" onPress={() => void requestBatteryOptimizationExemption()} />
+        </View>
       </Panel>
 
       <ActionButton label="Sign out" icon={LogOut} tone="danger" loading={signingOut} onPress={confirmSignOut} />

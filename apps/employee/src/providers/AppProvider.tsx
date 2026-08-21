@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { apiFetch } from '../lib/api'
 import { pakistanToday } from '../lib/format'
 import { supabase } from '../lib/supabase'
+import { config } from '../config'
 import {
   captureCurrentLocation,
   isWithinOfficeHours,
@@ -13,6 +14,10 @@ import {
   stopOfficeTracking,
   uploadLocationSamples,
 } from '../services/tracking'
+import {
+  saveAuthTokenForBackground,
+  scheduleTrackingAlarms,
+} from '../services/alarmScheduler'
 import type { Attendance, Employee, LocationPayload, TrackingPolicy, Visit } from '../types'
 
 type AppData = { employee: Employee; policy: TrackingPolicy }
@@ -91,6 +96,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAttendance(Array.isArray(attendanceRows) ? attendanceRows : [])
       setVisits(Array.isArray(visitRows) ? visitRows : [])
       setLatestLocation(normalizeLocation(latest.latest_sample))
+
+      // Save auth credentials to Android SharedPreferences so NireTrackingService
+      // can call the API even when the app is fully closed (alarm-triggered background run)
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      if (currentSession?.access_token) {
+        const installationId = me.employee.id ?? 'unknown'
+        await saveAuthTokenForBackground(
+          currentSession.access_token,
+          config.apiBaseUrl,
+          String(installationId),
+          JSON.stringify(nextData.policy)
+        ).catch(() => undefined)
+        await scheduleTrackingAlarms(nextData.policy).catch(() => undefined)
+      }
+
       await syncTracking(nextData.policy)
     } finally {
       setLoading(false)

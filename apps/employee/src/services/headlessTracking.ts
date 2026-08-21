@@ -14,31 +14,50 @@ type HeadlessData = {
 
 async function fetchLatestPolicy(): Promise<TrackingPolicy | null> {
   try {
+    console.log('[HeadlessTracking] Fetching latest policy from server...')
     const me = await apiFetch<{ policy?: TrackingPolicy } | null>('/api/mobile/me')
-    return me?.policy ?? null
-  } catch {
-    // Fall back to locally cached policy if network is unavailable
-    return getSavedTrackingPolicy()
+    if (me?.policy) {
+      console.log('[HeadlessTracking] Successfully fetched policy from server.')
+      return me.policy
+    }
+  } catch (err) {
+    console.log('[HeadlessTracking] Failed to fetch policy from server (offline?), falling back to local cache. Error:', err)
   }
+
+  const localPolicy = await getSavedTrackingPolicy()
+  console.log('[HeadlessTracking] Local cached policy:', localPolicy)
+  return localPolicy
 }
 
 async function headlessTrackingTask(data: HeadlessData) {
+  console.log('[HeadlessTracking] Task started with data:', data)
   const { action } = data
 
-  if (action === 'stop') {
-    await stopOfficeTracking(false)
+  try {
+    if (action === 'stop') {
+      console.log('[HeadlessTracking] Stopping office tracking...')
+      await stopOfficeTracking(false)
+      console.log('[HeadlessTracking] Office tracking stopped.')
+    }
+
+    const policy = await fetchLatestPolicy()
+    if (!policy) {
+      console.log('[HeadlessTracking] No tracking policy found (server & local cache empty). Aborting.')
+      return
+    }
+
+    if (action === 'start') {
+      console.log('[HeadlessTracking] Starting office tracking with policy:', policy)
+      const result = await startOfficeTracking(policy)
+      console.log('[HeadlessTracking] startOfficeTracking result:', result)
+    }
+
+    console.log('[HeadlessTracking] Rescheduling alarms...')
+    await scheduleTrackingAlarms(policy)
+    console.log('[HeadlessTracking] Alarms rescheduled successfully.')
+  } catch (err) {
+    console.error('[HeadlessTracking] Critical error in headless task:', err)
   }
-
-  // Always re-fetch latest policy to pick up any admin changes, then reschedule
-  const policy = await fetchLatestPolicy()
-  if (!policy) return
-
-  if (action === 'start') {
-    await startOfficeTracking(policy)
-  }
-
-  // Reschedule alarms for the next occurrence (tomorrow or today if not yet passed)
-  await scheduleTrackingAlarms(policy)
 }
 
-export default () => headlessTrackingTask
+export default headlessTrackingTask

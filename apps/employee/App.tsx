@@ -17,18 +17,16 @@ import { supabase } from './src/lib/supabase'
 import {
   captureCurrentLocation,
   isWithinOfficeHours,
-  registerLocationHealthCheck,
   requestLocationPermissions,
   startOfficeTracking,
   stopOfficeTracking,
   uploadLocationSamples,
 } from './src/services/tracking'
 import {
-  cancelTrackingAlarms,
-  canScheduleExactAlarms,
-  openAlarmPermissionSettings,
-  scheduleTrackingAlarms,
-} from './src/services/alarmScheduler'
+  AppPermissionsState,
+  checkAllPermissions,
+} from './src/services/permissions'
+import { ProfileView } from './src/components/ProfileView'
 import { Attendance, Employee, LocationPayload, TrackingPolicy, Visit } from './src/types'
 
 type AppData = {
@@ -36,7 +34,7 @@ type AppData = {
   policy: TrackingPolicy
 }
 
-type Tab = 'today' | 'attendance' | 'visits'
+type Tab = 'today' | 'attendance' | 'visits' | 'profile'
 
 type LatestLocationResponse = {
   latest_sample: LocationPayload | null
@@ -141,9 +139,16 @@ function EmployeeApp() {
   const [visits, setVisits] = useState<Visit[]>([])
   const [loading, setLoading] = useState(true)
   const [trackingMessage, setTrackingMessage] = useState('')
-  const [needsAlarmPermission, setNeedsAlarmPermission] = useState(false)
   const [latestLocation, setLatestLocation] = useState<LocationPayload | null>(null)
   const [refreshingLocation, setRefreshingLocation] = useState(false)
+  const [permissionsState, setPermissionsState] = useState<AppPermissionsState | null>(null)
+
+  async function loadPermissionsStatus() {
+    const permStatus = await checkAllPermissions()
+    setPermissionsState(permStatus)
+  }
+
+
 
   async function load() {
     setLoading(true)
@@ -163,7 +168,7 @@ function EmployeeApp() {
       setVisits(Array.isArray(visitRows) ? visitRows : [])
       setLatestLocation(latest.latest_sample)
       await syncTracking(appData.policy)
-      await checkAlarmPermission()
+      await loadPermissionsStatus()
     } catch (error) {
       Alert.alert('Could not load app', error instanceof Error ? error.message : 'Please try again.')
     } finally {
@@ -173,11 +178,6 @@ function EmployeeApp() {
 
   async function syncTracking(policy: TrackingPolicy) {
     try {
-      // Always keep the background health task registered (15-min fallback)
-      await registerLocationHealthCheck()
-      // Schedule exact alarms for precise start/stop (cancels + re-sets each call)
-      await scheduleTrackingAlarms(policy).catch(() => undefined)
-
       if (isWithinOfficeHours(policy)) {
         const result = await startOfficeTracking(policy)
         setTrackingMessage(result.started ? 'Tracking active during office hours' : result.reason ?? 'Tracking not active')
@@ -188,11 +188,6 @@ function EmployeeApp() {
     } catch {
       setTrackingMessage('Tracking status will retry when the network is available')
     }
-  }
-
-  async function checkAlarmPermission() {
-    const ok = await canScheduleExactAlarms()
-    setNeedsAlarmPermission(!ok)
   }
 
   useEffect(() => {
@@ -209,7 +204,10 @@ function EmployeeApp() {
     if (!data?.policy) return
 
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') void syncTracking(data.policy)
+      if (nextState === 'active') {
+        void syncTracking(data.policy)
+        void loadPermissionsStatus()
+      }
     })
 
     return () => subscription.remove()
@@ -231,7 +229,6 @@ function EmployeeApp() {
     setVisits([])
     setLatestLocation(null)
     void stopOfficeTracking(true).catch(() => undefined)
-    void cancelTrackingAlarms().catch(() => undefined)
     await supabase.auth.signOut({ scope: 'local' })
   }
 
@@ -254,13 +251,14 @@ function EmployeeApp() {
 
   return (
     <SafeAreaView style={styles.screen}>
+
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>Nire Employee</Text>
           <Text style={styles.headerTitle}>{data?.employee.full_name ?? 'Employee'}</Text>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.lightButton}>
-          <Text style={styles.lightButtonText}>Sign out</Text>
+        <TouchableOpacity onPress={() => setTab('profile')} style={styles.lightButton}>
+          <Text style={styles.lightButtonText}>Profile</Text>
         </TouchableOpacity>
       </View>
 
@@ -269,6 +267,7 @@ function EmployeeApp() {
           ['today', 'Today'],
           ['attendance', 'Attendance'],
           ['visits', 'Visits'],
+          ['profile', 'Profile'],
         ].map(([key, label]) => (
           <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={[styles.tab, tab === key && styles.activeTab]}>
             <Text style={[styles.tabText, tab === key && styles.activeTabText]}>{label}</Text>
@@ -284,14 +283,9 @@ function EmployeeApp() {
             visits={visits}
             todayRecord={todayRecord}
             trackingMessage={trackingMessage}
-            needsAlarmPermission={needsAlarmPermission}
             latestLocation={latestLocation}
             refreshingLocation={refreshingLocation}
             onRefresh={load}
-            onOpenAlarmSettings={async () => {
-              await openAlarmPermissionSettings()
-              await checkAlarmPermission()
-            }}
             onRefreshLocation={async () => {
               setRefreshingLocation(true)
               try {
@@ -306,6 +300,7 @@ function EmployeeApp() {
             }}
             onRequestPermissions={async () => {
               const result = await requestLocationPermissions()
+              await loadPermissionsStatus()
               Alert.alert(
                 'Location status',
                 result.foreground && result.background && result.servicesEnabled
@@ -318,6 +313,18 @@ function EmployeeApp() {
         )}
         {tab === 'attendance' && <AttendanceView attendance={Array.isArray(attendance) ? attendance : []} todayRecord={todayRecord} onChanged={load} />}
         {tab === 'visits' && <VisitsView visits={Array.isArray(visits) ? visits : []} onChanged={load} />}
+        {tab === 'profile' && data && (
+          <ProfileView
+            employee={data.employee}
+            policy={data.policy}
+            permissionsState={permissionsState}
+            onRefreshPermissions={async () => {
+              await loadPermissionsStatus()
+              await syncTracking(data.policy)
+            }}
+            onSignOut={signOut}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -329,11 +336,9 @@ function TodayView({
   visits,
   todayRecord,
   trackingMessage,
-  needsAlarmPermission,
   latestLocation,
   refreshingLocation,
   onRefresh,
-  onOpenAlarmSettings,
   onRefreshLocation,
   onRequestPermissions,
 }: {
@@ -342,131 +347,141 @@ function TodayView({
   visits: Visit[]
   todayRecord: Attendance | null
   trackingMessage: string
-  needsAlarmPermission: boolean
   latestLocation: LocationPayload | null
   refreshingLocation: boolean
   onRefresh: () => void
-  onOpenAlarmSettings: () => void
-  onRefreshLocation: () => void
-  onRequestPermissions: () => void
+  onRefreshLocation: () => Promise<void>
+  onRequestPermissions: () => Promise<void>
 }) {
-  return (
-    <View style={styles.stack}>
-      {needsAlarmPermission && (
-        <View style={styles.alarmBanner}>
-          <Text style={styles.alarmBannerTitle}>?? Auto-Start Permission Required</Text>
-          <Text style={styles.alarmBannerBody}>
-            Allow 'Alarms {'&'} Reminders' so tracking starts automatically at your scheduled time without opening the app.
-          </Text>
-          <TouchableOpacity onPress={onOpenAlarmSettings} style={styles.alarmBannerButton}>
-            <Text style={styles.alarmBannerButtonText}>Open Settings</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Office Hours</Text>
-        <Text style={styles.bigText}>
-          {data.policy.office_start_time.slice(0, 5)} - {data.policy.office_end_time.slice(0, 5)}
-        </Text>
-        <Text style={styles.muted}>Every {data.policy.sample_interval_minutes} minutes</Text>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{trackingMessage}</Text>
-        </View>
-        <TouchableOpacity onPress={onRequestPermissions} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Check permissions</Text>
-        </TouchableOpacity>
-      </View>
+  const [busyAction, setBusyAction] = useState<string | null>(null)
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Current Location</Text>
-        <Text style={styles.bigText}>
-          {latestLocation ? `${latestLocation.lat.toFixed(5)}, ${latestLocation.lng.toFixed(5)}` : 'Not captured yet'}
-        </Text>
-        {!!latestLocation?.address && <Text style={styles.muted}>{latestLocation.address}</Text>}
-        <Text style={styles.muted}>
-          {latestLocation
-            ? `Accuracy ${latestLocation.accuracy ? `${Math.round(latestLocation.accuracy)}m` : 'unknown'} - ${formatTime(latestLocation.recorded_at ?? new Date().toISOString())}`
-            : 'Location will appear after tracking or manual refresh'}
-        </Text>
-        <TouchableOpacity disabled={refreshingLocation} onPress={onRefreshLocation} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>{refreshingLocation ? 'Refreshing...' : 'Refresh location'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.grid}>
-        <Stat label="Present days" value={String(attendance.length)} />
-        <Stat label="Visits" value={String(visits.length)} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Today</Text>
-        <Text style={styles.bigText}>{todayRecord ? 'Attendance started' : 'Not checked in'}</Text>
-        <Text style={styles.muted}>
-          {todayRecord
-            ? `${formatTime(todayRecord.clock_in_at)}${todayRecord.clock_out_at ? ` - ${formatTime(todayRecord.clock_out_at)}` : ''}`
-            : 'Auto tracking still runs during office hours'}
-        </Text>
-      </View>
-
-      <TouchableOpacity onPress={onRefresh} style={styles.lightButtonWide}>
-        <Text style={styles.lightButtonText}>Refresh</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-function AttendanceView({
-  attendance,
-  todayRecord,
-  onChanged,
-}: {
-  attendance: Attendance[]
-  todayRecord: Attendance | null
-  onChanged: () => void
-}) {
-  const [busy, setBusy] = useState<'in' | 'out' | null>(null)
-
-  async function submit(action: 'in' | 'out') {
-    setBusy(action)
+  async function submitAttendance(action: 'in' | 'out') {
+    setBusyAction(action)
     try {
       const location = await captureCurrentLocation(action === 'in' ? 'attendance_checkin' : 'attendance_checkout')
       const addressResult = await apiFetch<LocationNameResponse>(
         `/api/mobile/location-name?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
       ).catch(() => ({ address: null }))
-      const endpoint = '/api/mobile/attendance'
-      await apiFetch(endpoint, {
+      await apiFetch('/api/mobile/attendance', {
         method: action === 'in' ? 'POST' : 'PATCH',
-        body: JSON.stringify({ ...location, address: addressResult.address ?? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}` }),
+        body: JSON.stringify({
+          ...location,
+          address: addressResult.address ?? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
+        }),
       })
-      await onChanged()
+      onRefresh()
     } catch (error) {
-      Alert.alert('Attendance failed', error instanceof Error ? error.message : 'Please try again.')
+      Alert.alert('Check-in failed', error instanceof Error ? error.message : 'Please try again.')
     } finally {
-      setBusy(null)
+      setBusyAction(null)
     }
   }
 
   return (
     <View style={styles.stack}>
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Attendance</Text>
-        <Text style={styles.bigText}>{todayRecord ? 'Checked in today' : 'Ready'}</Text>
-        <Text style={styles.muted}>{todayRecord?.clock_out_at ? 'Checkout completed' : todayRecord ? 'Checkout pending' : 'Capture location to check in'}</Text>
-        {!todayRecord && (
-          <TouchableOpacity disabled={busy !== null} onPress={() => submit('in')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{busy === 'in' ? 'Checking in...' : 'Check in'}</Text>
+        <Text style={styles.cardTitle}>Today's Status</Text>
+        <Text style={styles.bigText}>
+          {todayRecord?.clock_in_at ? (todayRecord.clock_out_at ? 'Shift Completed' : 'Checked In') : 'Not Checked In'}
+        </Text>
+        <Text style={styles.muted}>
+          Office hours: {data.policy.office_start_time.slice(0, 5)} - {data.policy.office_end_time.slice(0, 5)} ({data.policy.timezone})
+        </Text>
+
+        <View style={styles.statusPill}>
+          <Text style={styles.statusText}>{trackingMessage}</Text>
+        </View>
+
+        {!todayRecord?.clock_in_at && (
+          <TouchableOpacity disabled={!!busyAction} onPress={() => submitAttendance('in')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{busyAction === 'in' ? 'Checking in...' : 'Clock In'}</Text>
           </TouchableOpacity>
         )}
-        {todayRecord && !todayRecord.clock_out_at && (
-          <TouchableOpacity disabled={busy !== null} onPress={() => submit('out')} style={styles.warningButton}>
-            <Text style={styles.primaryButtonText}>{busy === 'out' ? 'Checking out...' : 'Check out'}</Text>
+
+        {todayRecord?.clock_in_at && !todayRecord?.clock_out_at && (
+          <TouchableOpacity disabled={!!busyAction} onPress={() => submitAttendance('out')} style={styles.warningButton}>
+            <Text style={styles.primaryButtonText}>{busyAction === 'out' ? 'Checking out...' : 'Clock Out'}</Text>
           </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.grid}>
+        <Stat label="Total Attendance" value={String(attendance.length)} />
+        <Stat label="Total Visits" value={String(visits.length)} />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Location Tracking</Text>
+        {latestLocation ? (
+          <>
+            <Text style={styles.muted}>Last recorded location</Text>
+            <Text style={styles.listTitle}>{latestLocation.address ?? `${latestLocation.lat.toFixed(5)}, ${latestLocation.lng.toFixed(5)}`}</Text>
+            <Text style={styles.muted}>
+              Recorded at: {formatDate(latestLocation.recorded_at ?? new Date().toISOString())} - {formatTime(latestLocation.recorded_at ?? new Date().toISOString())}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.muted}>No location samples recorded yet today.</Text>
+        )}
+
+        <TouchableOpacity disabled={refreshingLocation} onPress={onRefreshLocation} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>{refreshingLocation ? 'Updating...' : 'Refresh current location'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onRequestPermissions} style={styles.lightButtonWide}>
+          <Text style={styles.lightButtonText}>Check Location Permissions</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+function AttendanceView({ attendance, todayRecord, onChanged }: { attendance: Attendance[]; todayRecord: Attendance | null; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+
+  async function toggle(action: 'in' | 'out') {
+    setBusy(true)
+    try {
+      const location = await captureCurrentLocation(action === 'in' ? 'attendance_checkin' : 'attendance_checkout')
+      const addressResult = await apiFetch<LocationNameResponse>(
+        `/api/mobile/location-name?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
+      ).catch(() => ({ address: null }))
+      await apiFetch('/api/mobile/attendance', {
+        method: action === 'in' ? 'POST' : 'PATCH',
+        body: JSON.stringify({
+          ...location,
+          address: addressResult.address ?? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
+        }),
+      })
+      onChanged()
+    } catch (error) {
+      Alert.alert('Attendance failed', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <View style={styles.stack}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Quick Action</Text>
+        {!todayRecord?.clock_in_at ? (
+          <TouchableOpacity disabled={busy} onPress={() => toggle('in')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{busy ? 'Processing...' : 'Clock In'}</Text>
+          </TouchableOpacity>
+        ) : !todayRecord?.clock_out_at ? (
+          <TouchableOpacity disabled={busy} onPress={() => toggle('out')} style={styles.warningButton}>
+            <Text style={styles.primaryButtonText}>{busy ? 'Processing...' : 'Clock Out'}</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.muted}>You have completed your shift today.</Text>
         )}
       </View>
 
       {attendance.map((record) => (
         <View key={record.id} style={styles.listItem}>
-          <Text style={styles.listTitle}>{record.date}</Text>
+          <Text style={styles.listTitle}>{formatDate(record.date)}</Text>
+          <Text style={styles.muted}>Status: {record.clock_out_at ? 'Completed' : 'Checked In'}</Text>
           <Text style={styles.muted}>
             {formatTime(record.clock_in_at)}
             {record.clock_out_at ? ` - ${formatTime(record.clock_out_at)}` : ' - pending'}
@@ -809,36 +824,5 @@ const styles = StyleSheet.create({
     color: '#18181b',
     fontWeight: '800',
     marginBottom: 4,
-  },
-  alarmBanner: {
-    backgroundColor: '#fffbeb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-    padding: 16,
-    gap: 8,
-  },
-  alarmBannerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#92400e',
-  },
-  alarmBannerBody: {
-    fontSize: 13,
-    color: '#78350f',
-    lineHeight: 18,
-  },
-  alarmBannerButton: {
-    minHeight: 40,
-    borderRadius: 8,
-    backgroundColor: '#f59e0b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  alarmBannerButtonText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 13,
   },
 })
