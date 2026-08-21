@@ -122,31 +122,35 @@ export async function POST(req: Request) {
     })
   }
 
-  let payloadForInsert = throttledPayload.map((sample) => (
-    sample.source === 'scheduled' ? { ...sample, address: null } : sample
-  ))
-  const newestScheduled = payloadForInsert
-    .filter((sample) => sample.source === 'scheduled')
-    .sort((left, right) => Date.parse(left.recorded_at) - Date.parse(right.recorded_at))
-    .pop()
+  const { data: lastAddressedSample } = await ctx.service
+    .from('location_samples')
+    .select('recorded_at')
+    .eq('employee_id', ctx.employee.id)
+    .eq('source', 'scheduled')
+    .not('address', 'is', null)
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  if (newestScheduled) {
-    const { data: lastAddressedSample } = await ctx.service
-      .from('location_samples')
-      .select('recorded_at')
-      .eq('employee_id', ctx.employee.id)
-      .eq('source', 'scheduled')
-      .not('address', 'is', null)
-      .order('recorded_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+  const lastAddressedAt = lastAddressedSample ? Date.parse(lastAddressedSample.recorded_at) : Number.NEGATIVE_INFINITY
+  const thirtyMinutesMs = 30 * 60 * 1000
+  let shouldLookupAddress = (Date.now() - lastAddressedAt) >= thirtyMinutesMs
 
-    const lastAddressedAt = lastAddressedSample ? Date.parse(lastAddressedSample.recorded_at) : Number.NEGATIVE_INFINITY
-    if (Date.parse(newestScheduled.recorded_at) - lastAddressedAt >= 30 * 60 * 1000) {
-      const address = await reverseGeocodeOpenStreetMap(newestScheduled.lat, newestScheduled.lng)
-      if (address) payloadForInsert = payloadForInsert.map((sample) => sample === newestScheduled ? { ...sample, address } : sample)
-    }
-  }
+  const payloadForInsert = await Promise.all(
+    throttledPayload.map(async (sample, index) => {
+      let address: string | null = sample.address || null
+      if (sample.source !== 'scheduled' && address) {
+        return { ...sample, address }
+      }
+      if (shouldLookupAddress && index === throttledPayload.length - 1) {
+        address = await reverseGeocodeOpenStreetMap(sample.lat, sample.lng)
+        shouldLookupAddress = false
+      } else {
+        address = null
+      }
+      return { ...sample, address }
+    })
+  )
 
   const { data, error } = await ctx.service.from('location_samples').insert(payloadForInsert).select()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
