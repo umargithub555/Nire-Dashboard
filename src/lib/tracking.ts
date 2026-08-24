@@ -66,8 +66,10 @@ export function getStalenessStatus(lastSeenAt: string | null, intervalMinutes: n
   if (!lastSeenAt) return 'never'
 
   const ageMinutes = (Date.now() - new Date(lastSeenAt).getTime()) / 60000
-  if (ageMinutes <= intervalMinutes) return 'active'
-  if (ageMinutes <= intervalMinutes * 3) return 'stale'
+  // 7-minute grace buffer (12 minutes total for 5-min interval) before marking Stale
+  const activeThreshold = Math.max(intervalMinutes + 3, 8)
+  if (ageMinutes <= activeThreshold) return 'active'
+  if (ageMinutes <= activeThreshold * 3) return 'stale'
   return 'offline'
 }
 
