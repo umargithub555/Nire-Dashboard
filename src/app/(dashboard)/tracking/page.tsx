@@ -147,7 +147,7 @@ export default function TrackingPage() {
           <div>
             <h1 className="text-xl lg:text-2xl font-semibold text-zinc-900">Tracking</h1>
             <p className="text-sm text-zinc-500 mt-0.5">
-              {policy ? `${policy.office_start_time.slice(0, 5)} - ${policy.office_end_time.slice(0, 5)} - every ${policy.sample_interval_minutes} min` : 'Loading policy'}
+              {policy ? `Every ${policy.sample_interval_minutes} min updates (hours managed per branch)` : 'Loading policy'}
             </p>
           </div>
           <button
@@ -185,25 +185,8 @@ export default function TrackingPage() {
               <h2 className="font-semibold text-zinc-900">Global Settings</h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1.5">
-                <span className="text-xs font-medium text-zinc-500">Start</span>
-                <input
-                  type="time"
-                  value={form.office_start_time}
-                  onChange={(e) => setForm((f) => ({ ...f, office_start_time: e.target.value }))}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </label>
-              <label className="space-y-1.5">
-                <span className="text-xs font-medium text-zinc-500">End</span>
-                <input
-                  type="time"
-                  value={form.office_end_time}
-                  onChange={(e) => setForm((f) => ({ ...f, office_end_time: e.target.value }))}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </label>
+            <div className="rounded-lg bg-blue-50/70 border border-blue-100 p-3 text-xs text-blue-800">
+              ⏰ <strong>Shift Hours:</strong> Managed per branch under <a href="/branches" className="underline font-semibold text-blue-900">Branches</a> tab.
             </div>
 
             <label className="space-y-1.5 block">
