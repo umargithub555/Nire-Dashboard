@@ -82,7 +82,8 @@ export async function POST(req: Request) {
     sample.source !== 'scheduled' || isWithinPolicyHoursAt(activePolicy, sample.recorded_at)
   ))
   const discardedOutsideOfficeHours = payload.length - acceptedPayload.length
-  const scheduledIntervalMs = Math.max(activePolicy.sample_interval_minutes, 1) * 60 * 1000
+  // 1-minute grace tolerance window for mobile timer drift
+  const scheduledIntervalMs = (Math.max(activePolicy.sample_interval_minutes, 1) * 60 * 1000) - 60000
   const scheduledCandidates = acceptedPayload
     .filter((sample) => sample.source === 'scheduled')
     .sort((left, right) => Date.parse(left.recorded_at) - Date.parse(right.recorded_at))
