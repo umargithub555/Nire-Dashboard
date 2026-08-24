@@ -155,6 +155,24 @@ export async function POST(req: Request) {
 
   const { data, error } = await ctx.service.from('location_samples').insert(payloadForInsert).select()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Clear previous errors and mark location services enabled on successful sample receipt
+  const sampleInstallationId = payloadForInsert.find((s) => s.installation_id)?.installation_id
+  if (sampleInstallationId) {
+    await ctx.service
+      .from('employee_devices')
+      .update({
+        location_services_enabled: true,
+        permission_foreground: true,
+        permission_background: true,
+        last_error: null,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('employee_id', ctx.employee.id)
+      .eq('installation_id', sampleInstallationId)
+  }
+
   return NextResponse.json({ uploaded: data?.length ?? 0, discarded_outside_office_hours: discardedOutsideOfficeHours, discarded_too_frequent: discardedTooFrequent, upload_batch_id: uploadBatchId })
 }
 
