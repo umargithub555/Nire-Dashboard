@@ -1,65 +1,23 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendEmail, buildCredentialsEmailHtml } from '@/lib/email'
 
 async function sendCredentialsEmail(email: string, password: string, fullName: string, origin: string) {
-  const apiKey = process.env.RESEND_API_KEY
   const appUrl = origin || 'http://localhost:3000'
+  const subject = 'Welcome to Nire — Your Account Credentials'
+  const htmlContent = buildCredentialsEmailHtml({
+    fullName,
+    email,
+    password,
+    appUrl,
+    type: 'welcome',
+  })
 
-  const subject = 'Your Nire Account Credentials'
-  const htmlContent = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e4e4e7; border-radius: 12px;">
-      <h2 style="color: #2563eb; margin-top: 0;">Welcome to Nire, ${fullName}!</h2>
-      <p style="color: #3f3f46; line-height: 1.5;">Your manager has created an account for you on Nire Dashboard.</p>
-      <p style="color: #3f3f46; line-height: 1.5;">Here are the credentials you will use to log in:</p>
-      <div style="background-color: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0 0 10px 0;"><strong>Login Page:</strong> <a href="${appUrl}/login">${appUrl}/login</a></p>
-        <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${email}</p>
-        <p style="margin: 0;"><strong>Password:</strong> ${password}</p>
-      </div>
-      <p style="color: #3f3f46; line-height: 1.5;">Please log in and change your password in your settings as soon as possible.</p>
-      <p style="color: #71717a; font-size: 12px; margin-top: 30px; border-top: 1px solid #e4e4e7; padding-top: 15px;">
-        This is an automated message. Please do not reply directly to this email.
-      </p>
-    </div>
-  `
-
-  if (!apiKey) {
-    console.log(`
-=========================================
-[MOCK EMAIL SENT]
-To: ${fullName} <${email}>
-Subject: ${subject}
-Body:
-${htmlContent.replace(/<[^>]*>/g, '')}
-=========================================
-    `)
-    return
-  }
-
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Nire Onboarding <onboarding@resend.dev>',
-        to: [email],
-        subject: subject,
-        html: htmlContent,
-      }),
-    })
-
-    if (!res.ok) {
-      const errorData = await res.json()
-      console.error('Failed to send email via Resend API:', errorData)
-    } else {
-      console.log(`Onboarding email successfully sent to ${email} via Resend.`)
-    }
-  } catch (err) {
-    console.error('Error in sendCredentialsEmail:', err)
-  }
+  await sendEmail({
+    to: email,
+    subject,
+    html: htmlContent,
+  })
 }
 
 export async function GET(req: NextRequest) {

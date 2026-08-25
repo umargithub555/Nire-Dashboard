@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, Eye, EyeOff, Pencil, Trash2, Phone, Building2, Briefcase } from 'lucide-react'
+import { Plus, Eye, EyeOff, Pencil, Trash2, Phone, Building2, Briefcase, KeyRound } from 'lucide-react'
 import { Employee, Branch } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -10,6 +10,9 @@ export default function EmployeesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null)
+  const [employeeToResetPass, setEmployeeToResetPass] = useState<Employee | null>(null)
+  const [resetPasswordInput, setResetPasswordInput] = useState('')
+  const [showResetPasswordToggle, setShowResetPasswordToggle] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [form, setForm] = useState({
@@ -92,6 +95,34 @@ export default function EmployeesPage() {
     setLoading(false)
   }
 
+  async function handleResetPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!employeeToResetPass) return
+    if (resetPasswordInput.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+    setLoading(true)
+    const res = await fetch('/api/employees/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: employeeToResetPass.id,
+        newPassword: resetPasswordInput,
+      }),
+    })
+    if (res.ok) {
+      toast.success(`Password reset for ${employeeToResetPass.full_name} & email sent!`)
+      setEmployeeToResetPass(null)
+      setResetPasswordInput('')
+      setShowResetPasswordToggle(false)
+    } else {
+      const err = await res.json()
+      toast.error(err.error || 'Failed to reset password')
+    }
+    setLoading(false)
+  }
+
   return (
     <div className="space-y-5 lg:space-y-6">
       {/* Page header */}
@@ -158,6 +189,9 @@ export default function EmployeesPage() {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-1">
+                    <button onClick={() => setEmployeeToResetPass(emp)} className="p-1.5 hover:bg-amber-50 rounded-md text-zinc-500 hover:text-amber-600 transition-colors" title="Reset Password">
+                      <KeyRound size={15} />
+                    </button>
                     <button onClick={() => handleOpenEdit(emp)} className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-500 hover:text-zinc-800 transition-colors" title="Edit">
                       <Pencil size={15} />
                     </button>
@@ -226,6 +260,12 @@ export default function EmployeesPage() {
             </div>
 
             <div className="mt-3 pt-3 border-t border-zinc-100 flex gap-2">
+              <button
+                onClick={() => setEmployeeToResetPass(emp)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200"
+              >
+                <KeyRound size={13} /> Password
+              </button>
               <button
                 onClick={() => handleOpenEdit(emp)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-lg transition-colors border border-zinc-200"
@@ -336,6 +376,71 @@ export default function EmployeesPage() {
                 {loading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset Password Modal ── */}
+      {employeeToResetPass && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900 text-lg">Reset Password</h3>
+                <p className="text-xs text-zinc-500">{employeeToResetPass.full_name} ({employeeToResetPass.email})</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showResetPasswordToggle ? 'text' : 'password'}
+                    value={resetPasswordInput}
+                    onChange={(e) => setResetPasswordInput(e.target.value)}
+                    placeholder="Enter new password (min 6 chars)"
+                    className="w-full pl-3 pr-10 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPasswordToggle(!showResetPasswordToggle)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none"
+                  >
+                    {showResetPasswordToggle ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1.5 leading-normal">
+                  An automated email containing this new password will immediately be delivered to <strong>{employeeToResetPass.email}</strong> via Gmail SMTP.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmployeeToResetPass(null)
+                    setResetPasswordInput('')
+                    setShowResetPasswordToggle(false)
+                  }}
+                  className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {loading ? 'Updating...' : 'Update & Send Email'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
