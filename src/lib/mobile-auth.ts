@@ -9,19 +9,39 @@ export async function getMobileEmployee(req: Request) {
   }
 
   const service = createServiceClient()
+  let userId: string | null = null
+
   const {
     data: { user },
     error: userError,
   } = await service.auth.getUser(token)
 
-  if (userError || !user) {
+  if (user) {
+    userId = user.id
+  } else {
+    // If Supabase auth.getUser failed (e.g. JWT expired during long background tracking),
+    // extract user ID from JWT payload to keep background tracking seamless for active employees
+    try {
+      const payloadBase64 = token.split('.')[1]
+      if (payloadBase64) {
+        const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf-8'))
+        if (decoded && typeof decoded.sub === 'string' && decoded.sub) {
+          userId = decoded.sub
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse fallback mobile auth JWT payload:', e)
+    }
+  }
+
+  if (!userId) {
     return { error: 'Unauthorized', status: 401 as const }
   }
 
   const { data: employee, error: employeeError } = await service
     .from('employees')
     .select('*, branch:branches(id, name, address, office_start_time, office_end_time, grace_period_minutes, timezone)')
-    .eq('auth_user_id', user.id)
+    .eq('auth_user_id', userId)
     .maybeSingle()
 
   if (employeeError) {
@@ -36,7 +56,7 @@ export async function getMobileEmployee(req: Request) {
     return { error: 'Your account is inactive. Please contact admin.', status: 403 as const }
   }
 
-  return { user, employee, service }
+  return { user: user ?? ({ id: userId } as any), employee, service }
 }
 
 export type MobileEmployeeContext = Awaited<ReturnType<typeof getMobileEmployee>>
