@@ -17,9 +17,11 @@ import {
   Building2,
   CalendarDays,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react'
 import { Attendance, Branch, Employee } from '@/types'
 import { evaluateAttendance, AttendanceAnalysis } from '@/lib/attendance-calculator'
+import { generateMonthlyAttendancePdf } from '@/lib/pdf-export'
 
 const MapModal = dynamic(() => import('@/components/ui/MapModal'), {
   ssr: false,
@@ -230,6 +232,17 @@ export default function AttendancePage() {
     }
   }, [monthlySummaryList])
 
+  function handleDownloadMonthlyPdf() {
+    const selectedBranchObj = branches.find((b) => b.id === branchFilter)
+    const branchName = selectedBranchObj ? selectedBranchObj.name : 'All Branches'
+
+    generateMonthlyAttendancePdf({
+      monthStr: month,
+      branchName,
+      summaries: monthlySummaryList,
+    })
+  }
+
   return (
     <>
       <div className="space-y-5 lg:space-y-6">
@@ -274,7 +287,7 @@ export default function AttendancePage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {viewMode === 'daily' ? (
             <input
               type="date"
@@ -303,6 +316,16 @@ export default function AttendancePage() {
               </option>
             ))}
           </select>
+
+          {viewMode === 'monthly' && (
+            <button
+              onClick={handleDownloadMonthlyPdf}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold rounded-lg transition-all shadow-sm sm:ml-auto cursor-pointer"
+            >
+              <Download size={16} />
+              Download Monthly PDF Report
+            </button>
+          )}
         </div>
 
         {/* ========================================================= */}
