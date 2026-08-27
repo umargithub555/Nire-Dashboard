@@ -68,8 +68,8 @@ export function buildCredentialsEmailHtml({
   const badgeText = isWelcome ? 'New Account Created' : 'Security Update'
   const badgeColor = isWelcome ? '#2563eb' : '#d97706'
   const message = isWelcome
-    ? 'Your administrator has set up a new employee account for you on the Nire Management System. Below are your official login credentials to access the mobile app and web dashboard.'
-    : 'Your administrator has updated your account password. Below are your new official login credentials to access the mobile app and web portal.'
+    ? 'Your administrator has set up a new employee account for you on the Nire Management System. Below are your official login credentials to access the mobile app.'
+    : 'Your administrator has updated your account password. Below are your new official login credentials to access the mobile app.'
 
   return `
 <!DOCTYPE html>
