@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
         return NextResponse.json(
           {
-            error: `Check-in rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check in from the office.`,
+            error: `Check-in rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check in from with in the allowed radius.`,
           },
           { status: 400 }
         )
@@ -106,7 +106,7 @@ export async function PATCH(req: Request) {
         const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
         return NextResponse.json(
           {
-            error: `Check-out rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check out from the office.`,
+            error: `Check-out rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check out from within the allowed radius.`,
           },
           { status: 400 }
         )
