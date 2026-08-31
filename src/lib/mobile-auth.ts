@@ -40,7 +40,7 @@ export async function getMobileEmployee(req: Request) {
 
   const { data: employee, error: employeeError } = await service
     .from('employees')
-    .select('*, branch:branches(id, name, address, office_start_time, office_end_time, grace_period_minutes, timezone)')
+    .select('*, branch:branches(id, name, address, office_start_time, office_end_time, grace_period_minutes, timezone, latitude, longitude, radius_meters)')
     .eq('auth_user_id', userId)
     .maybeSingle()
 

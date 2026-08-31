@@ -1,5 +1,6 @@
 import { getMobileEmployee } from '@/lib/mobile-auth'
 import { todayDateString } from '@/lib/tracking'
+import { calculateHaversineDistanceMeters } from '@/lib/geo'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
@@ -25,6 +26,29 @@ export async function POST(req: Request) {
   const body = (await req.json()) as AttendanceLocationBody
   if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
     return NextResponse.json({ error: 'Valid location is required for check-in.' }, { status: 400 })
+  }
+
+  // Geofence Radius Validation for On-site Staff
+  const empType = (ctx.employee.employee_type || 'onsite').toLowerCase()
+  if (empType !== 'marketing') {
+    const branch = ctx.employee.branch as any
+    const branchLat = typeof branch?.latitude === 'number' ? branch.latitude : (branch?.latitude ? parseFloat(String(branch.latitude)) : null)
+    const branchLng = typeof branch?.longitude === 'number' ? branch.longitude : (branch?.longitude ? parseFloat(String(branch.longitude)) : null)
+    const allowedRadius = typeof branch?.radius_meters === 'number' ? branch.radius_meters : (branch?.radius_meters ? parseFloat(String(branch.radius_meters)) : 100)
+
+    if (typeof branchLat === 'number' && typeof branchLng === 'number' && !isNaN(branchLat) && !isNaN(branchLng)) {
+      const distanceMeters = calculateHaversineDistanceMeters(body.lat, body.lng, branchLat, branchLng)
+      if (distanceMeters > allowedRadius) {
+        const distKm = (distanceMeters / 1000).toFixed(1)
+        const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
+        return NextResponse.json(
+          {
+            error: `Check-in rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check in from the office.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   const today = todayDateString()
@@ -65,6 +89,29 @@ export async function PATCH(req: Request) {
   const body = (await req.json()) as AttendanceLocationBody
   if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
     return NextResponse.json({ error: 'Valid location is required for check-out.' }, { status: 400 })
+  }
+
+  // Geofence Radius Validation for On-site Staff
+  const empType = (ctx.employee.employee_type || 'onsite').toLowerCase()
+  if (empType !== 'marketing') {
+    const branch = ctx.employee.branch as any
+    const branchLat = typeof branch?.latitude === 'number' ? branch.latitude : (branch?.latitude ? parseFloat(String(branch.latitude)) : null)
+    const branchLng = typeof branch?.longitude === 'number' ? branch.longitude : (branch?.longitude ? parseFloat(String(branch.longitude)) : null)
+    const allowedRadius = typeof branch?.radius_meters === 'number' ? branch.radius_meters : (branch?.radius_meters ? parseFloat(String(branch.radius_meters)) : 100)
+
+    if (typeof branchLat === 'number' && typeof branchLng === 'number' && !isNaN(branchLat) && !isNaN(branchLng)) {
+      const distanceMeters = calculateHaversineDistanceMeters(body.lat, body.lng, branchLat, branchLng)
+      if (distanceMeters > allowedRadius) {
+        const distKm = (distanceMeters / 1000).toFixed(1)
+        const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
+        return NextResponse.json(
+          {
+            error: `Check-out rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check out from the office.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   const today = todayDateString()

@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { calculateHaversineDistanceMeters } from '@/lib/geo'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -30,12 +31,40 @@ export async function POST(req: Request) {
 
   const body = await req.json()
   const service = createServiceClient()
-  const emp = await service.from('employees').select('id, branch_id, is_active').eq('auth_user_id', user.id).maybeSingle()
+  const emp = await service
+    .from('employees')
+    .select('id, branch_id, is_active, employee_type, branch:branches(latitude, longitude, radius_meters)')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
   if (emp.error) return NextResponse.json({ error: emp.error.message }, { status: 500 })
   if (!emp.data) return NextResponse.json({ error: 'Employee profile not found' }, { status: 404 })
   if (!emp.data.is_active) return NextResponse.json({ error: 'Your account is inactive. Please contact admin.' }, { status: 403 })
   if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
     return NextResponse.json({ error: 'Valid location is required for check-in.' }, { status: 400 })
+  }
+
+  // Geofence Radius Validation for On-site Staff
+  const empType = (emp.data.employee_type || 'onsite').toLowerCase()
+  if (empType !== 'marketing') {
+    const branch = emp.data.branch as any
+    const branchLat = typeof branch?.latitude === 'number' ? branch.latitude : (branch?.latitude ? parseFloat(String(branch.latitude)) : null)
+    const branchLng = typeof branch?.longitude === 'number' ? branch.longitude : (branch?.longitude ? parseFloat(String(branch.longitude)) : null)
+    const allowedRadius = typeof branch?.radius_meters === 'number' ? branch.radius_meters : (branch?.radius_meters ? parseFloat(String(branch.radius_meters)) : 100)
+
+    if (typeof branchLat === 'number' && typeof branchLng === 'number' && !isNaN(branchLat) && !isNaN(branchLng)) {
+      const distanceMeters = calculateHaversineDistanceMeters(body.lat, body.lng, branchLat, branchLng)
+      if (distanceMeters > allowedRadius) {
+        const distKm = (distanceMeters / 1000).toFixed(1)
+        const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
+        return NextResponse.json(
+          {
+            error: `Check-in rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check in from the office.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -79,13 +108,40 @@ export async function PATCH(req: Request) {
 
   const body = await req.json()
   const service = createServiceClient()
-  const emp = await service.from('employees').select('id, is_active').eq('auth_user_id', user.id).maybeSingle()
+  const emp = await service
+    .from('employees')
+    .select('id, is_active, employee_type, branch:branches(latitude, longitude, radius_meters)')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
 
   if (emp.error) return NextResponse.json({ error: emp.error.message }, { status: 500 })
   if (!emp.data) return NextResponse.json({ error: 'Employee profile not found' }, { status: 404 })
   if (!emp.data.is_active) return NextResponse.json({ error: 'Your account is inactive. Please contact admin.' }, { status: 403 })
   if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
     return NextResponse.json({ error: 'Valid location is required for check-out.' }, { status: 400 })
+  }
+
+  // Geofence Radius Validation for On-site Staff
+  const empType = (emp.data.employee_type || 'onsite').toLowerCase()
+  if (empType !== 'marketing') {
+    const branch = emp.data.branch as any
+    const branchLat = typeof branch?.latitude === 'number' ? branch.latitude : (branch?.latitude ? parseFloat(String(branch.latitude)) : null)
+    const branchLng = typeof branch?.longitude === 'number' ? branch.longitude : (branch?.longitude ? parseFloat(String(branch.longitude)) : null)
+    const allowedRadius = typeof branch?.radius_meters === 'number' ? branch.radius_meters : (branch?.radius_meters ? parseFloat(String(branch.radius_meters)) : 100)
+
+    if (typeof branchLat === 'number' && typeof branchLng === 'number' && !isNaN(branchLat) && !isNaN(branchLng)) {
+      const distanceMeters = calculateHaversineDistanceMeters(body.lat, body.lng, branchLat, branchLng)
+      if (distanceMeters > allowedRadius) {
+        const distKm = (distanceMeters / 1000).toFixed(1)
+        const displayDist = distanceMeters >= 1000 ? `${distKm} km` : `${Math.round(distanceMeters)} m`
+        return NextResponse.json(
+          {
+            error: `Check-out rejected: You are ${displayDist} away from your assigned office (Allowed radius: ${allowedRadius}m). On-site staff must check out from the office.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -123,7 +179,6 @@ export async function PATCH(req: Request) {
       .eq('id', attendance.data.id)
       .select()
       .single()
-
     data = retry.data
     error = retry.error
   }
@@ -132,9 +187,8 @@ export async function PATCH(req: Request) {
   return NextResponse.json(data)
 }
 
-function shouldRetryWithoutAccuracy(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("Could not find the 'clock_in_accuracy_meters' column") ||
-    error?.message?.includes("Could not find the 'clock_out_accuracy_meters' column")
-  )
+function shouldRetryWithoutAccuracy(error: any) {
+  if (!error) return false
+  const msg = String(error.message || '').toLowerCase()
+  return msg.includes('clock_in_accuracy_meters') || msg.includes('clock_out_accuracy_meters') || msg.includes('column')
 }
