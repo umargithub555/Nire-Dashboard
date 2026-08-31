@@ -10,7 +10,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone } = body
+  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone, latitude, longitude, radius_meters } = body
   const service = createServiceClient()
   const { data, error } = await service.from('branches').insert({
     name,
@@ -19,7 +19,11 @@ export async function POST(req: NextRequest) {
     office_end_time: office_end_time || '17:00',
     grace_period_minutes: typeof grace_period_minutes === 'number' ? grace_period_minutes : 20,
     timezone: timezone || 'Asia/Karachi',
+    latitude: typeof latitude === 'number' ? latitude : (latitude ? parseFloat(String(latitude)) : null),
+    longitude: typeof longitude === 'number' ? longitude : (longitude ? parseFloat(String(longitude)) : null),
+    radius_meters: typeof radius_meters === 'number' ? radius_meters : (radius_meters ? parseFloat(String(radius_meters)) : 100),
   }).select().single()
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
@@ -30,7 +34,7 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Missing branch ID' }, { status: 400 })
 
   const body = await req.json()
-  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone } = body
+  const { name, address, office_start_time, office_end_time, grace_period_minutes, timezone, latitude, longitude, radius_meters } = body
   const service = createServiceClient()
 
   const { data, error } = await service
@@ -42,6 +46,9 @@ export async function PUT(req: NextRequest) {
       office_end_time: office_end_time || '17:00',
       grace_period_minutes: typeof grace_period_minutes === 'number' ? grace_period_minutes : 20,
       timezone: timezone || 'Asia/Karachi',
+      latitude: typeof latitude === 'number' ? latitude : (latitude ? parseFloat(String(latitude)) : null),
+      longitude: typeof longitude === 'number' ? longitude : (longitude ? parseFloat(String(longitude)) : null),
+      radius_meters: typeof radius_meters === 'number' ? radius_meters : (radius_meters ? parseFloat(String(radius_meters)) : 100),
     })
     .eq('id', id)
     .select()

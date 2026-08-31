@@ -6,6 +6,9 @@ export type Branch = {
   office_end_time?: string
   grace_period_minutes?: number
   timezone?: string
+  latitude?: number | null
+  longitude?: number | null
+  radius_meters?: number | null
   created_at: string
 }
 
@@ -20,6 +23,7 @@ export type Employee = {
   salary?: number | null
   avatar_url: string | null
   is_active: boolean
+  employee_type?: 'onsite' | 'marketing' | string
   created_at: string
   branch?: Branch
 }

@@ -19,6 +19,7 @@ export default function EmployeesPage() {
     full_name: '', email: '', password: '',
     phone: '', designation: '', branch_id: '',
     salary: '',
+    employee_type: 'onsite',
     is_active: true
   })
 
@@ -43,6 +44,7 @@ export default function EmployeesPage() {
       designation: emp.designation || '',
       branch_id: emp.branch_id || '',
       salary: emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '',
+      employee_type: emp.employee_type || 'onsite',
       is_active: emp.is_active
     })
     setShowModal(true)
@@ -52,7 +54,7 @@ export default function EmployeesPage() {
     setShowModal(false)
     setEditEmployee(null)
     setShowPassword(false)
-    setForm({ full_name: '', email: '', password: '', phone: '', designation: '', branch_id: '', salary: '', is_active: true })
+    setForm({ full_name: '', email: '', password: '', phone: '', designation: '', branch_id: '', salary: '', employee_type: 'onsite', is_active: true })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -98,42 +100,43 @@ export default function EmployeesPage() {
   async function handleResetPasswordSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!employeeToResetPass) return
-    if (resetPasswordInput.length < 6) {
-      toast.error('Password must be at least 6 characters')
+    if (!resetPasswordInput || resetPasswordInput.trim().length < 6) {
+      toast.error('Password must be at least 6 characters long')
       return
     }
+
     setLoading(true)
     const res = await fetch('/api/employees/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        employeeId: employeeToResetPass.id,
-        newPassword: resetPasswordInput,
+        employee_id: employeeToResetPass.id,
+        new_password: resetPasswordInput,
       }),
     })
+
+    const data = await res.json()
     if (res.ok) {
-      toast.success(`Password reset for ${employeeToResetPass.full_name} & email sent!`)
+      toast.success(`Password reset for ${employeeToResetPass.full_name}. Email sent!`)
       setEmployeeToResetPass(null)
       setResetPasswordInput('')
       setShowResetPasswordToggle(false)
     } else {
-      const err = await res.json()
-      toast.error(err.error || 'Failed to reset password')
+      toast.error(data.error || 'Failed to reset password')
     }
     setLoading(false)
   }
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      {/* Page header */}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-zinc-900">Employees</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">{employees.length} members</p>
+          <p className="text-sm text-zinc-500 mt-0.5">{employees.length} employee{employees.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm active:scale-95"
+          className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
         >
           <Plus size={16} />
           <span className="hidden sm:inline">Add employee</span>
@@ -141,13 +144,14 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* ── Desktop table (hidden on mobile) ── */}
+      {/* ── Desktop Table ── */}
       <div className="hidden lg:block bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-150 bg-zinc-50/50">
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Name</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Branch</th>
+              <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Designation</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Monthly Salary</th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Phone</th>
@@ -158,7 +162,7 @@ export default function EmployeesPage() {
           <tbody className="divide-y divide-zinc-100">
             {employees.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-zinc-400">No employees found</td>
+                <td colSpan={8} className="text-center py-10 text-zinc-400">No employees found</td>
               </tr>
             )}
             {employees.map((emp: any) => (
@@ -175,6 +179,15 @@ export default function EmployeesPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-zinc-600 font-medium">{emp.branch?.name ?? '—'}</td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    emp.employee_type === 'marketing'
+                      ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    {emp.employee_type === 'marketing' ? 'Marketing Staff' : 'On-site Staff'}
+                  </span>
+                </td>
                 <td className="px-6 py-4 text-zinc-600 font-medium">{emp.designation ?? '—'}</td>
                 <td className="px-6 py-4 text-zinc-800 font-semibold">
                   {emp.salary ? `₨ ${Number(emp.salary).toLocaleString('en-PK')}` : '—'}
@@ -189,13 +202,13 @@ export default function EmployeesPage() {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-1">
-                    <button onClick={() => setEmployeeToResetPass(emp)} className="p-1.5 hover:bg-amber-50 rounded-md text-zinc-500 hover:text-amber-600 transition-colors" title="Reset Password">
+                    <button onClick={() => setEmployeeToResetPass(emp)} className="p-1.5 hover:bg-amber-50 rounded-md text-zinc-500 hover:text-amber-600 transition-colors cursor-pointer" title="Reset Password">
                       <KeyRound size={15} />
                     </button>
-                    <button onClick={() => handleOpenEdit(emp)} className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-500 hover:text-zinc-800 transition-colors" title="Edit">
+                    <button onClick={() => handleOpenEdit(emp)} className="p-1.5 hover:bg-zinc-100 rounded-md text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer" title="Edit">
                       <Pencil size={15} />
                     </button>
-                    <button onClick={() => setEmployeeToDelete(emp)} className="p-1.5 hover:bg-red-50 rounded-md text-zinc-500 hover:text-red-600 transition-colors" title="Delete">
+                    <button onClick={() => setEmployeeToDelete(emp)} className="p-1.5 hover:bg-red-50 rounded-md text-zinc-500 hover:text-red-600 transition-colors cursor-pointer" title="Delete">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -233,6 +246,16 @@ export default function EmployeesPage() {
             </div>
 
             <div className="mt-3 space-y-1.5">
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-100">
+                <span className="text-zinc-400">Category:</span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full font-semibold ${
+                  emp.employee_type === 'marketing'
+                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
+                  {emp.employee_type === 'marketing' ? 'Marketing Staff' : 'On-site Staff'}
+                </span>
+              </div>
               {emp.branch?.name && (
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
                   <Building2 size={12} className="text-zinc-400" />
@@ -262,19 +285,19 @@ export default function EmployeesPage() {
             <div className="mt-3 pt-3 border-t border-zinc-100 flex gap-2">
               <button
                 onClick={() => setEmployeeToResetPass(emp)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200 cursor-pointer"
               >
                 <KeyRound size={13} /> Password
               </button>
               <button
                 onClick={() => handleOpenEdit(emp)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-lg transition-colors border border-zinc-200"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-lg transition-colors border border-zinc-200 cursor-pointer"
               >
                 <Pencil size={13} /> Edit
               </button>
               <button
                 onClick={() => setEmployeeToDelete(emp)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200 cursor-pointer"
               >
                 <Trash2 size={13} /> Delete
               </button>
@@ -307,7 +330,7 @@ export default function EmployeesPage() {
                         required
                       />
                       <button type="button" onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none">
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none cursor-pointer">
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
@@ -331,6 +354,22 @@ export default function EmployeesPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5">Employee Type / Staff Category</label>
+                <select
+                  value={form.employee_type}
+                  onChange={e => setForm(f => ({ ...f, employee_type: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all font-medium text-zinc-800"
+                  required
+                >
+                  <option value="onsite">On-site Staff (Restricted to Office Radius)</option>
+                  <option value="marketing">Marketing / Field Staff (Check in Anywhere)</option>
+                </select>
+                <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                  On-site staff must be within branch radius to check in. Marketing staff can check in from any location.
+                </p>
+              </div>
+
               {editEmployee && (
                 <div className="flex items-center gap-2.5 py-1">
                   <input type="checkbox" id="is_active" checked={form.is_active}
@@ -345,12 +384,80 @@ export default function EmployeesPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={handleCloseModal}
-                  className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors">
+                  className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={loading}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors">
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer">
                   {loading ? (editEmployee ? 'Saving…' : 'Creating…') : (editEmployee ? 'Save changes' : 'Create employee')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Direct Reset Password Modal ── */}
+      {employeeToResetPass && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                  <KeyRound size={18} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-zinc-900 text-base">Reset Password</h3>
+                  <p className="text-xs text-zinc-500">{employeeToResetPass.full_name} ({employeeToResetPass.email})</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1 uppercase tracking-wider">
+                  New Meaningful Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showResetPasswordToggle ? 'text' : 'password'}
+                    value={resetPasswordInput}
+                    onChange={(e) => setResetPasswordInput(e.target.value)}
+                    placeholder="Enter new password (e.g. Pakistan@2026)"
+                    className="w-full pl-3 pr-10 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all font-mono"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPasswordToggle(!showResetPasswordToggle)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                  >
+                    {showResetPasswordToggle ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
+                  Enter a new password. It will be updated instantly and automatically emailed to <span className="font-medium text-zinc-700">{employeeToResetPass.email}</span> via Gmail SMTP.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmployeeToResetPass(null)
+                    setResetPasswordInput('')
+                  }}
+                  className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
+                >
+                  {loading ? 'Updating & Emailing...' : 'Update & Send Email'}
                 </button>
               </div>
             </form>
@@ -364,83 +471,25 @@ export default function EmployeesPage() {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6 shadow-xl">
             <h3 className="font-semibold text-zinc-900 text-lg mb-2">Delete Employee</h3>
             <p className="text-sm text-zinc-500 mb-6 leading-relaxed">
-              Are you sure you want to delete <span className="font-semibold text-zinc-800">"{employeeToDelete.full_name}"</span>? This will permanently delete their account and data.
+              Are you sure you want to delete <span className="font-medium text-zinc-800">"{employeeToDelete.full_name}"</span>? This action will permanently remove their profile and login account.
             </p>
             <div className="flex gap-3">
-              <button type="button" onClick={() => setEmployeeToDelete(null)}
-                className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => setEmployeeToDelete(null)}
+                className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors cursor-pointer"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={() => handleDelete(employeeToDelete.id)} disabled={loading}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors">
+              <button
+                type="button"
+                onClick={() => handleDelete(employeeToDelete.id)}
+                disabled={loading}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              >
                 {loading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Reset Password Modal ── */}
-      {employeeToResetPass && (
-        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
-                <KeyRound size={20} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-zinc-900 text-lg">Reset Password</h3>
-                <p className="text-xs text-zinc-500">{employeeToResetPass.full_name} ({employeeToResetPass.email})</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1.5">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showResetPasswordToggle ? 'text' : 'password'}
-                    value={resetPasswordInput}
-                    onChange={(e) => setResetPasswordInput(e.target.value)}
-                    placeholder="Enter new password (min 6 chars)"
-                    className="w-full pl-3 pr-10 py-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPasswordToggle(!showResetPasswordToggle)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none"
-                  >
-                    {showResetPasswordToggle ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <p className="text-xs text-zinc-500 mt-1.5 leading-normal">
-                  An automated email containing this new password will immediately be delivered to <strong>{employeeToResetPass.email}</strong> via Gmail SMTP.
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmployeeToResetPass(null)
-                    setResetPasswordInput('')
-                    setShowResetPasswordToggle(false)
-                  }}
-                  className="flex-1 py-2.5 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  {loading ? 'Updating...' : 'Update & Send Email'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
