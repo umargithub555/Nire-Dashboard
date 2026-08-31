@@ -35,5 +35,3 @@ export function parseCoordinatesString(input: string): { lat: number | null; lng
   }
   return { lat: null, lng: null }
 }
-
-33.64666105709045, 73.03556991301271
