@@ -15,8 +15,15 @@ export async function GET(req: NextRequest) {
 
   if (date) query = query.eq('date', date)
   if (month) {
-    const startOfMonth = `${month}-01`
-    query = query.gte('date', startOfMonth).lte('date', `${month}-31`)
+    const [yearStr, monthStr] = month.split('-')
+    const year = parseInt(yearStr, 10)
+    const m = parseInt(monthStr, 10)
+    if (!isNaN(year) && !isNaN(m)) {
+      const lastDay = new Date(year, m, 0).getDate()
+      const startOfMonth = `${month}-01`
+      const endOfMonth = `${month}-${String(lastDay).padStart(2, '0')}`
+      query = query.gte('date', startOfMonth).lte('date', endOfMonth)
+    }
   }
   if (branch_id) query = query.eq('branch_id', branch_id)
 

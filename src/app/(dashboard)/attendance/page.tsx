@@ -89,14 +89,20 @@ export default function AttendancePage() {
   useEffect(() => {
     const params = new URLSearchParams({ date })
     if (branchFilter) params.set('branch_id', branchFilter)
-    fetch(`/api/attendance?${params}`).then(r => r.json()).then(setDailyAttendance)
+    fetch(`/api/attendance?${params}`)
+      .then(r => r.json())
+      .then(data => setDailyAttendance(Array.isArray(data) ? data : []))
+      .catch(() => setDailyAttendance([]))
   }, [date, branchFilter])
 
   // Fetch monthly attendance
   useEffect(() => {
     const params = new URLSearchParams({ month })
     if (branchFilter) params.set('branch_id', branchFilter)
-    fetch(`/api/attendance?${params}`).then(r => r.json()).then(setMonthlyAttendance)
+    fetch(`/api/attendance?${params}`)
+      .then(r => r.json())
+      .then(data => setMonthlyAttendance(Array.isArray(data) ? data : []))
+      .catch(() => setMonthlyAttendance([]))
   }, [month, branchFilter])
 
   function openMap(record: AttendanceRecord, type: 'checkin' | 'checkout') {
@@ -153,9 +159,10 @@ export default function AttendancePage() {
       ? employees.filter(e => e.branch_id === branchFilter)
       : employees
 
+    const safeMonthlyAttendance = Array.isArray(monthlyAttendance) ? monthlyAttendance : []
     return filteredEmployees.map(emp => {
       // Find all records for this employee in the month
-      const empRecords = monthlyAttendance.filter(
+      const empRecords = safeMonthlyAttendance.filter(
         rec => rec.employee_id === emp.id || (rec.employee as any)?.id === emp.id
       )
 
