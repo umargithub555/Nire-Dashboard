@@ -3,7 +3,7 @@ import { CalendarCheck, ChartNoAxesCombined, ClipboardList, House, UserRound } f
 import { LoadingScreen } from '../../src/components/ui'
 import { useApp } from '../../src/providers/AppProvider'
 import { colors } from '../../src/theme'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import React, { useEffect, useState } from 'react'
 import { OnboardingPermissionModal } from '../../src/components/OnboardingPermissionModal'
@@ -23,25 +23,47 @@ export default function AppTabsLayout() {
 
   useEffect(() => {
     if (!session) return
-    ;(async () => {
+
+    async function evaluatePermissions() {
       const completed = await hasCompletedOnboarding()
       const state = await checkAllPermissions()
       setPermissionsState(state)
-      // Show modal if onboarding not done OR any required permission is missing
       if (!completed || !state.allGranted) {
         setShowOnboarding(true)
+      } else {
+        setShowOnboarding(false)
       }
-    })()
+    }
+
+    void evaluatePermissions()
+
+    // Listen for app state changes (when user returns from system settings/battery prompt)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        void checkAllPermissions().then((state) => {
+          setPermissionsState(state)
+          if (state.allGranted) {
+            void markOnboardingCompleted()
+            setShowOnboarding(false)
+          }
+        })
+      }
+    })
+
+    return () => {
+      subscription.remove()
+    }
   }, [session])
 
   function handleOnboardingCompleted(newState: AppPermissionsState) {
     setPermissionsState(newState)
-    if (newState.allGranted) {
-      void markOnboardingCompleted()
-      setShowOnboarding(false)
-    }
-    // If not all granted, keep modal open so user can open settings
-    // but still allow dismissing by going back
+    void markOnboardingCompleted()
+    setShowOnboarding(false)
+  }
+
+  function handleDismiss() {
+    void markOnboardingCompleted()
+    setShowOnboarding(false)
   }
 
   if (initializing) return <LoadingScreen label="Loading your workday..." />
@@ -78,6 +100,7 @@ export default function AppTabsLayout() {
         visible={showOnboarding}
         permissionsState={permissionsState}
         onCompleted={handleOnboardingCompleted}
+        onDismiss={handleDismiss}
       />
     </>
   )

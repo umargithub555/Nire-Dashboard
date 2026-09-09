@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AppPermissionsState, openAppSettings, requestAllPermissionsSequentially } from '../services/permissions'
 
@@ -6,9 +6,10 @@ type Props = {
   visible: boolean
   permissionsState: AppPermissionsState | null
   onCompleted: (newState: AppPermissionsState) => void
+  onDismiss: () => void
 }
 
-export function OnboardingPermissionModal({ visible, permissionsState, onCompleted }: Props) {
+export function OnboardingPermissionModal({ visible, permissionsState, onCompleted, onDismiss }: Props) {
   const [requesting, setRequesting] = useState(false)
 
   async function handleGrant() {
@@ -22,9 +23,13 @@ export function OnboardingPermissionModal({ visible, permissionsState, onComplet
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onDismiss}>
       <View style={styles.overlay}>
         <View style={styles.card}>
+          <TouchableOpacity onPress={onDismiss} style={styles.closeBtn} accessibilityLabel="Close">
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+
           <View style={styles.badgeWrap}>
             <Text style={styles.badgeIcon}>🛡️</Text>
           </View>
@@ -37,7 +42,7 @@ export function OnboardingPermissionModal({ visible, permissionsState, onComplet
             <View style={styles.item}>
               <Text style={styles.itemIcon}>📍</Text>
               <View style={styles.itemTextWrap}>
-                <Text style={styles.itemTitle}>Location ("Allow All The Time")</Text>
+                <Text style={styles.itemTitle}>Location (&quot;Allow All The Time&quot;)</Text>
                 <Text style={styles.itemMuted}>Used to log shift location and visits automatically.</Text>
               </View>
             </View>
@@ -51,10 +56,10 @@ export function OnboardingPermissionModal({ visible, permissionsState, onComplet
             </View>
 
             <View style={styles.item}>
-              <Text style={styles.itemIcon}>🛰️</Text>
+              <Text style={styles.itemIcon}>⚡</Text>
               <View style={styles.itemTextWrap}>
-                <Text style={styles.itemTitle}>GPS Location Services</Text>
-                <Text style={styles.itemMuted}>Must be enabled on your phone for accuracy.</Text>
+                <Text style={styles.itemTitle}>Battery (Unrestricted)</Text>
+                <Text style={styles.itemMuted}>Allows background tracking while phone is locked.</Text>
               </View>
             </View>
           </View>
@@ -65,11 +70,15 @@ export function OnboardingPermissionModal({ visible, permissionsState, onComplet
             </Text>
           </TouchableOpacity>
 
-          {permissionsState && !permissionsState.allGranted && (
+          <View style={styles.btnRow}>
             <TouchableOpacity onPress={openAppSettings} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Open System Settings</Text>
+              <Text style={styles.secondaryButtonText}>System Settings</Text>
             </TouchableOpacity>
-          )}
+
+            <TouchableOpacity onPress={onDismiss} style={styles.continueButton}>
+              <Text style={styles.continueButtonText}>Continue to App</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -84,6 +93,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
+    position: 'relative',
     backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 24,
@@ -93,6 +103,23 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
+  closeBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f4f4f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    color: '#71717a',
+    fontWeight: '700',
+  },
   badgeWrap: {
     width: 56,
     height: 56,
@@ -101,28 +128,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   badgeIcon: {
     fontSize: 28,
   },
   title: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: '#18181b',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#71717a',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
+    lineHeight: 19,
+    marginBottom: 18,
   },
   list: {
-    gap: 16,
-    marginBottom: 24,
+    gap: 14,
+    marginBottom: 20,
   },
   item: {
     flexDirection: 'row',
@@ -158,17 +185,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  btnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
   secondaryButton: {
+    flex: 1,
     height: 44,
     borderRadius: 12,
     backgroundColor: '#f4f4f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
   },
   secondaryButtonText: {
     color: '#3f3f46',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  continueButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueButtonText: {
+    color: '#059669',
+    fontSize: 13,
+    fontWeight: '800',
   },
 })

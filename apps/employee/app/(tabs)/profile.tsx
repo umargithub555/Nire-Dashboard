@@ -77,8 +77,15 @@ export default function ProfilePage() {
       <Panel>
         <View style={styles.device}><View style={styles.deviceIcon}><Smartphone size={19} color={colors.primary} /></View><View style={styles.trackingCopy}><Text style={styles.trackingTitle}>Background Reliability</Text><Text style={styles.trackingText}>Ensure tracking runs uninterrupted when your screen is locked.</Text></View></View>
         <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-          <ActionButton label="Configure Autostart (Xiaomi / Samsung)" icon={Zap} tone="soft" onPress={() => void openAutostartSettings()} />
+          <ActionButton label="Configure Autostart (Infinix / Xiaomi / Samsung / Vivo)" icon={Zap} tone="soft" onPress={() => void openAutostartSettings()} />
           <ActionButton label="Unrestricted Battery Saver" icon={BatteryCharging} tone="soft" onPress={() => void requestBatteryOptimizationExemption()} />
+          <View style={styles.brandGuideBox}>
+            <Text style={styles.brandGuideTitle}>💡 Phone Brand Autostart Instructions:</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Infinix / Tecno</Text>: Phone Master → AutoStart / Auto-launch → Enable</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Xiaomi / Redmi</Text>: Security app → Autostart → Enable</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Samsung</Text>: Device Care → Battery → Set to Unrestricted</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Vivo / Oppo / Realme</Text>: iManager / Settings → Background power → Allow</Text>
+          </View>
         </View>
       </Panel>
 
@@ -110,4 +117,28 @@ const styles = StyleSheet.create({
   policyText: { flex: 1, color: colors.ink, fontSize: 13, fontWeight: '800' },
   device: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   deviceIcon: { width: 40, height: 40, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blueSoft },
+  brandGuideBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  brandGuideTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  brandGuideText: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#0f172a',
+  },
 })
