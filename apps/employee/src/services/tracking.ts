@@ -10,7 +10,7 @@ import { AppState, PermissionsAndroid, Platform } from 'react-native'
 import { apiFetch } from '../lib/api'
 import { getInstallationId } from '../lib/install'
 import { LocationPayload, TrackingPolicy } from '../types'
-import { startTrackingService, stopTrackingService } from './alarmScheduler'
+import { isBatteryOptimizationIgnored, startTrackingService, stopTrackingService } from './alarmScheduler'
 
 export const LOCATION_TASK_NAME = 'nire-office-hours-location'
 export const LOCATION_HEALTH_TASK_NAME = 'nire-location-health-check'
@@ -64,6 +64,17 @@ export async function getLocationReadiness() {
 export async function uploadDeviceStatus(extra: Record<string, unknown> = {}) {
   const installationId = await getInstallationId()
   const readiness = await getLocationReadiness()
+  const batteryIgnored = await isBatteryOptimizationIgnored().catch(() => true)
+
+  const computedLastError = extra.last_error !== undefined ? extra.last_error : (
+    !readiness.servicesEnabled
+      ? 'GPS location services turned OFF on device'
+      : !readiness.background
+      ? 'Background location permission missing'
+      : !readiness.foreground
+      ? 'Foreground location permission missing'
+      : null
+  )
 
   await apiFetch('/api/mobile/device-status', {
     method: 'POST',
@@ -76,6 +87,8 @@ export async function uploadDeviceStatus(extra: Record<string, unknown> = {}) {
       permission_foreground: readiness.foreground,
       permission_background: readiness.background,
       location_services_enabled: readiness.servicesEnabled,
+      battery_optimization_note: batteryIgnored ? 'unrestricted' : 'restricted_battery_saver_active',
+      last_error: computedLastError,
       ...extra,
     }),
   })
@@ -200,41 +213,30 @@ export async function startOfficeTracking(policy: TrackingPolicy) {
     return { started: false, reason: `Missing permissions: ${missing}. Please allow location access (all the time) in Settings.` }
   }
 
-  const intervalMs = policy.sample_interval_minutes * 60 * 1000
-  const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
-  if (alreadyStarted) {
-    await registerLocationHealthCheck()
-    await startTrackingService().catch(() => undefined)
-    return { started: true }
-  }
+  // Pure Native Tracking: unregister legacy Expo JS background tasks completely to prevent TaskBroadcastReceiver crashes on Android/Samsung
+  try {
+    if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false)) {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined)
+    }
+    if (await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME).catch(() => false)) {
+      await BackgroundTask.unregisterTaskAsync(LOCATION_HEALTH_TASK_NAME).catch(() => undefined)
+    }
+    await TaskManager.unregisterAllTasksAsync().catch(() => undefined)
+  } catch (_e) {}
 
-  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.High,
-    timeInterval: intervalMs,
-    distanceInterval: 0,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: 'Nire tracking active',
-      notificationBody: 'Office-hours location tracking is running.',
-      notificationColor: '#2563eb',
-    },
-  })
-
-  await registerLocationHealthCheck()
   await startTrackingService().catch(() => undefined)
   return { started: true }
 }
 
 export async function stopOfficeTracking(completely: boolean = false) {
-  const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)
-  if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME)
-  await stopTrackingService().catch(() => undefined)
+  try {
+    if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false)) {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined)
+    }
+    await TaskManager.unregisterAllTasksAsync().catch(() => undefined)
+  } catch (_e) {}
 
-  if (completely) {
-    const healthTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_HEALTH_TASK_NAME)
-    if (healthTaskRegistered) await BackgroundTask.unregisterTaskAsync(LOCATION_HEALTH_TASK_NAME)
-  }
+  await stopTrackingService().catch(() => undefined)
 }
 
 async function registerLocationHealthCheck() {

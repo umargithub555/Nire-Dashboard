@@ -57,7 +57,7 @@ export async function checkAllPermissions(): Promise<AppPermissionsState> {
 
     const allGranted = foregroundLocation && backgroundLocation && notifications && locationServices
 
-    return {
+    const state = {
       foregroundLocation,
       backgroundLocation,
       notifications,
@@ -65,6 +65,9 @@ export async function checkAllPermissions(): Promise<AppPermissionsState> {
       batteryOptimizationIgnored,
       allGranted,
     }
+
+    void uploadDeviceStatus().catch(() => undefined)
+    return state
   } catch {
     return {
       foregroundLocation: false,

@@ -11,8 +11,10 @@ export async function GET(req: NextRequest) {
 
   let query = service
     .from('visits')
+    .select('*, employee:employees(full_name, designation)')
     .select('*, employee:employees(id, full_name, designation, phone, avatar_url, branch_id, branch:branches(id, name))')
     .order('visited_at', { ascending: false })
+    .limit(100)
 
   if (branch_id) query = query.eq('branch_id', branch_id)
   if (employee_id) query = query.eq('employee_id', employee_id)

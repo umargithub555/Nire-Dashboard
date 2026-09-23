@@ -172,18 +172,25 @@ export function ProfileView({
             )}
           </View>
 
-          {/* Autostart (Xiaomi / Poco / Samsung / Oppo) */}
+          {/* Autostart & Brand-specific Background Start */}
           <View style={styles.permItem}>
             <View style={styles.permLeft}>
               <Text style={styles.permIcon}>⚡</Text>
               <View style={styles.permTextWrap}>
                 <Text style={styles.permTitle}>Autostart & Background Start</Text>
-                <Text style={styles.permSub}>Required on Xiaomi/Poco/Samsung</Text>
+                <Text style={styles.permSub}>Required on Infinix, Xiaomi, Samsung, Vivo & Oppo</Text>
               </View>
             </View>
             <TouchableOpacity onPress={openAutostartSettings} style={styles.enableButton}>
               <Text style={styles.enableButtonText}>Configure</Text>
             </TouchableOpacity>
+          </View>
+          <View style={styles.brandGuideBox}>
+            <Text style={styles.brandGuideTitle}>💡 Phone Brand Autostart Instructions:</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Infinix / Tecno</Text>: Phone Master → AutoStart / Auto-launch → Enable</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Xiaomi / Redmi</Text>: Security app → Autostart → Enable</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Samsung</Text>: Device Care → Battery → Set Nire Employee to Unrestricted</Text>
+            <Text style={styles.brandGuideText}>• <Text style={styles.boldText}>Vivo / Oppo / Realme</Text>: Settings / iManager → Background power consumption → Allow</Text>
           </View>
         </View>
 
@@ -359,5 +366,28 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontWeight: '800',
     fontSize: 14,
+  },
+  brandGuideBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 10,
+    marginTop: 6,
+    gap: 4,
+  },
+  brandGuideTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  brandGuideText: {
+    fontSize: 11,
+    color: '#475569',
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#0f172a',
   },
 })
